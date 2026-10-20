@@ -468,7 +468,22 @@ async function mountYT(slide, it) {
     width: '100%', height: '100%', videoId: it.media.id,
     playerVars: { autoplay: 1, playsinline: 1, rel: 0, origin: location.origin, start: saved || it.media.start || 0 },
     events: {
-      onReady: e => { clearTimeout(readyTimer); try { e.target.setPlaybackRate(settings.rate); } catch {} e.target.playVideo(); slide.classList.add('live'); },
+      onReady: e => {
+        clearTimeout(readyTimer);
+        try { e.target.setPlaybackRate(settings.rate); } catch {}
+        e.target.playVideo();
+        slide.classList.add('live');
+        // Chrome blocks autoplay with sound until you've clicked the page (scrolling doesn't count),
+        // so fall back to muted autoplay, like TikTok does, rather than sitting on a stopped player.
+        setTimeout(() => {
+          if (player !== p) return;
+          const st = p.getPlayerState();
+          if (st !== YT.PlayerState.PLAYING && st !== YT.PlayerState.BUFFERING && st !== YT.PlayerState.PAUSED) {
+            p.mute(); p.playVideo();
+            toast('🔇 Playing muted. Click the video for sound.', 4000);
+          }
+        }, 1500);
+      },
       onStateChange: e => {
         slide.classList.add('live');
         slide.classList.toggle('paused', e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.CUED);
@@ -493,16 +508,34 @@ async function mountYT(slide, it) {
 
 function mountTT(slide, it) {
   const f = document.createElement('iframe');
-  f.src = `https://www.tiktok.com/player/v1/${it.media.id}?autoplay=1&rel=0&description=1&music_info=1`;
+  f.src = `https://www.tiktok.com/player/v1/${it.media.id}?autoplay=1&loop=0&rel=0&description=1&music_info=1`;
   f.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture';
   f.allowFullscreen = true;
   slide.querySelector('.mount').replaceChildren(f);
   slide.classList.add('live');
-  ttFrame = f;
+  ttFrame = f; ttLastTime = 0; ttEnded = false;
 }
+
+// TikTok's player reports its state by postMessage. It may loop instead of ending, so also treat
+// "time jumped from the last second back to the start" as the end.
+let ttLastTime = 0, ttEnded = false;
+window.addEventListener('message', e => {
+  if (e.origin !== 'https://www.tiktok.com' || !ttFrame || e.source !== ttFrame.contentWindow) return;
+  let d = e.data;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
+  if (!d || !d['x-tiktok-player']) return;
+  let ended = d.type === 'onStateChange' && d.value === 0;
+  if (d.type === 'onCurrentTime' && d.value) {
+    const { currentTime: t, duration: dur } = d.value;
+    if (dur && ttLastTime > dur - 1.5 && t < 1) ended = true;
+    ttLastTime = t;
+  }
+  if (ended && !ttEnded) { ttEnded = true; if (settings.autoNext) go(1); }
+});
 
 function togglePlay() {
   if (!player || !player.getPlayerState) return;
+  if (player.isMuted && player.isMuted()) { player.unMute(); player.playVideo(); return; }
   player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
 }
 
@@ -537,8 +570,11 @@ function refreshBadge(id) { const i = visible.findIndex(v => v.id === id); if (i
 /* ---------------- navigation & controls ---------------- */
 function go(delta) {
   const j = activeIdx + delta;
-  if (slides[j]) slides[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
-  else if (delta > 0) toast('That\'s the end of the channel 🎉', 2500);
+  if (!slides[j]) { if (delta > 0) toast('That\'s the end of the channel 🎉', 2500); return; }
+  // Activate directly: when the tab is in the background Chrome pauses the IntersectionObserver,
+  // so waiting for it would leave auto-next stuck after the first video.
+  activate(j);
+  slides[j].scrollIntoView({ behavior: document.hidden ? 'instant' : 'smooth', block: 'start' });
 }
 function updateRail() {
   $('#speed').querySelector('small').textContent = settings.rate + 'x';
