@@ -6,7 +6,7 @@
 <title>Training Feed</title>
 <script>
 const Theme = (() => {
-  const CHOICES = [['dark', 'Dark'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['greyscale', 'Greyscale'], ['system', 'System'], ['custom', 'Custom']];
+  const CHOICES = [['system', 'System'], ['dark', 'Dark'], ['greyscale', 'Greyscale'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['custom', 'Custom']];
   // Must match the Dark :root values; this script runs before the stylesheet.
   const DEFAULT_COLORS = { bg: '#0b0b0f', panel: '#17171f', text: '#f2f2f5', accent: '#ff1675' };
   const APPLIED = ['--bg', '--panel', '--text', '--accent', '--on-accent', 'color-scheme'];
@@ -20,7 +20,7 @@ const Theme = (() => {
   let colors = sanitize(read('customColors'));
   function apply() {
     const root = document.documentElement;
-    root.dataset.theme = choice === 'system' ? (lightQuery.matches ? 'green' : 'dark') : choice;
+    root.dataset.theme = choice === 'system' ? (lightQuery.matches ? 'greyscale' : 'dark') : choice;
     APPLIED.forEach(v => root.style.removeProperty(v));
     if (choice !== 'custom') return;
     Object.entries(colors).forEach(([k, v]) => root.style.setProperty('--' + k, v));
