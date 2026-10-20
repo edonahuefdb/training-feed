@@ -2,7 +2,7 @@
 
 Branch: `feature/theme-selector`. Base: `main`.
 
-Adds a theme dropdown to the top bar and setup screen with System, Dark (today's look), Greyscale, Green Light, Pink Light, and Custom. Green Light, Pink Light, and Greyscale reuse palettes from the dashboard (`web-app/dashboard/Dashboard-lydia/wwwroot/index.html`): Green Light is its working-copy default, Pink Light is its default on `origin/main`. The choice persists in `localStorage` and applies before first paint.
+Adds a theme dropdown to the top bar and setup screen with System, Dark (today's look), Light Mode, Green Light, Pink Light, and Custom. Green Light, Pink Light, and Light Mode reuse palettes from the dashboard (`web-app/dashboard/Dashboard-lydia/wwwroot/index.html`): Green Light is its working-copy default, Pink Light is its default on `origin/main`. The choice persists in `localStorage` and applies before first paint.
 
 ## Phase 1: Chrome colors come from CSS variables
 
@@ -25,7 +25,7 @@ Acceptance:
 - Loading the feed with the Dark values looks identical to before (compare against the current server's page)
 - A search of the `<style>` block for hex colors outside the allowed spots returns nothing
 
-## Phase 2: Theme selector with Green Light, Pink Light, Greyscale, System
+## Phase 2: Theme selector with Green Light, Pink Light, Light Mode, System
 
 What exists today:
 - Settings live in the `store` helper, key prefix `psfeed:`, JSON values.
@@ -47,7 +47,7 @@ Tasks:
 - [x] Add both selects, wired to `Theme.setChoice`, keeping both in sync
 - [x] Add a toast on change, like the speed button
 
-Gate: Judge the Green Light, Pink Light, and Greyscale looks in the feed and setup screen. Bring screenshots or the live page.
+Gate: Judge the Green Light, Pink Light, and Light Mode looks in the feed and setup screen. Bring screenshots or the live page.
 
 Acceptance:
 - Switching themes updates the whole page, including the rail, badges, connection pill, and toast
