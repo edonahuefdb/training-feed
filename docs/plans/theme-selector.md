@@ -2,7 +2,7 @@
 
 Branch: `feature/theme-selector`. Base: `main`.
 
-Adds a theme dropdown to the top bar and setup screen with Dark (today's look), Day, Night, Greyscale, System, and Custom. Day, Night, and Greyscale reuse the palettes from `web-app/dashboard/Dashboard-lydia/wwwroot/index.html`. The choice persists in `localStorage` and applies before first paint.
+Adds a theme dropdown to the top bar and setup screen with Dark (today's look), Green Light, Pink Light, Greyscale, System, and Custom. Green Light, Pink Light, and Greyscale reuse palettes from the dashboard (`web-app/dashboard/Dashboard-lydia/wwwroot/index.html`): Green Light is its working-copy default, Pink Light is its default on `origin/main`. The choice persists in `localStorage` and applies before first paint.
 
 ## Phase 1: Chrome colors come from CSS variables
 
@@ -25,7 +25,7 @@ Acceptance:
 - Loading the feed with the Dark values looks identical to before (compare against the current server's page)
 - A search of the `<style>` block for hex colors outside the allowed spots returns nothing
 
-## Phase 2: Theme selector with Day, Night, Greyscale, System
+## Phase 2: Theme selector with Green Light, Pink Light, Greyscale, System
 
 What exists today:
 - Settings live in the `store` helper, key prefix `psfeed:`, JSON values.
@@ -33,21 +33,21 @@ What exists today:
 - The keydown handler skips events whose target is inside `select, input`.
 
 Contract / behavior:
-- `<html data-theme="...">` holds the resolved palette: `dark` (default), `day`, `night`, `greyscale`, or `custom`. The saved choice can also be `system`.
-- `day`, `night`, and `greyscale` take their core colors from the dashboard's `:root`, `night`, and `greyscale` blocks, mapped as: `--header` to `--panel`, `--background` to `--bg`, `--accent` to `--accent`, `--surface` to `--control`, `--highlight` to `--text` for dark themes. Each theme sets every variable from Phase 1.
-- `system` resolves to `dark` or `day` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
+- `<html data-theme="...">` holds the resolved palette: `dark` (default), `green`, `pink`, `greyscale`, or `custom`. The saved choice can also be `system`.
+- `green`, `pink`, and `greyscale` take their core colors from the dashboard palettes: `--background` to `--bg`, `--backdrop` to `--panel`, `--accent` to `--text`, `--header` to `--accent`, `--highlight` to `--control`, `--secondary` to `--control-hover`. Each theme sets every variable from Phase 1.
+- `system` resolves to `dark` or `green` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
 - The choice is stored as `psfeed:theme`. A small inline script in `<head>` reads it and sets `data-theme` before the stylesheet paints, so there is no flash.
 - A `select#theme` in `#top` and a second `select` in the setup `.box` stay in sync. Changing either applies the theme at once.
 - An unknown stored value falls back to `dark`.
 - Each palette sets CSS `color-scheme` (`dark` or `light`) so native controls (select, color input, scrollbars) match.
 
 Tasks:
-- [x] Add `[data-theme]` palette blocks for `day`, `night`, `greyscale`
+- [x] Add `[data-theme]` palette blocks for `green`, `pink`, `greyscale`
 - [x] Add the head script and the `system` resolver
-- [x] Add both selects and one `setTheme` function that updates `data-theme`, storage, and both selects
+- [x] Add both selects and one `applyTheme` function that updates `data-theme` and both selects, with storage written on change
 - [x] Add a toast on change, like the speed button
 
-Gate: Judge the Day, Night, and Greyscale looks in the feed and setup screen. Bring screenshots or the live page.
+Gate: Judge the Green Light, Pink Light, and Greyscale looks in the feed and setup screen. Bring screenshots or the live page.
 
 Acceptance:
 - Switching themes updates the whole page, including the rail, badges, connection pill, and toast
@@ -87,7 +87,7 @@ Acceptance:
 
 ## Open questions by story
 
-- **Theme list:** Dark, Day, Night, Greyscale, System, Custom. Recommended default; swap any in the gate.
+- **Theme list:** none blocking
 
 ## Deferred
 
