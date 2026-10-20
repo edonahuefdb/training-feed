@@ -7,14 +7,16 @@
 <script>
 const Theme = (() => {
   const CHOICES = [['dark', 'Dark'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['greyscale', 'Greyscale'], ['system', 'System'], ['custom', 'Custom']];
+  // Must match the Dark :root values; this script runs before the stylesheet.
   const DEFAULT_COLORS = { bg: '#0b0b0f', panel: '#17171f', text: '#f2f2f5', accent: '#ff1675' };
   const APPLIED = ['--bg', '--panel', '--text', '--accent', '--on-accent', 'color-scheme'];
   const lightQuery = matchMedia('(prefers-color-scheme: light)');
   const read = key => { try { return JSON.parse(localStorage.getItem('psfeed:' + key)); } catch { return null; } };
-  const write = (key, value) => localStorage.setItem('psfeed:' + key, JSON.stringify(value));
+  const write = (key, value) => { try { localStorage.setItem('psfeed:' + key, JSON.stringify(value)); } catch {} };
   const brightness = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
   const sanitize = c => Object.fromEntries(Object.keys(DEFAULT_COLORS).map(k => [k, /^#[0-9a-f]{6}$/i.test(c?.[k]) ? c[k] : DEFAULT_COLORS[k]]));
-  let choice = CHOICES.some(c => c[0] === read('theme')) ? read('theme') : 'dark';
+  const saved = read('theme');
+  let choice = CHOICES.some(c => c[0] === saved) ? saved : 'dark';
   let colors = sanitize(read('customColors'));
   function apply() {
     const root = document.documentElement;
@@ -42,26 +44,25 @@ const Theme = (() => {
           --rail:#ffffff1f; --rail-hover:#ffffff33; --rail-label:#ddd; --scrim:#000c; --toast-bg:#000d; --toast-fg:#f2f2f5; --toast-border:#333;
           --ok-bg:#1f3a2a; --ok-fg:#9be7b4; --bad-bg:#4a1f1f; --bad-fg:#ffb4b4; --done-bg:#173a25; --done-fg:#86efac; --pending-bg:#3a3217; --pending-fg:#fcd34d;
           color-scheme:dark; }
+  :root[data-theme="green"], :root[data-theme="pink"], :root[data-theme="greyscale"] {
+    --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#f8d7d7; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100; }
   :root[data-theme="green"] {
     --bg:#E4F1E8; --panel:#F5FBF6; --text:#163A2A; --muted:#4a6b59; --accent:#2F6F4E; --on-accent:#fff;
     --control:#BFE8C8; --control-hover:#A8D5BA; --border:#A8D5BA; --well:#E4F1E8; --field:#ffffffe6; --chip:#BFE8C8;
     --rail:#2F6F4E26; --rail-hover:#2F6F4E40; --rail-label:#163A2A; --scrim:#E4F1E8cc;
     --toast-bg:#163A2Af2; --toast-fg:#F5FBF6; --toast-border:#2F6F4E;
-    --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#f8d7d7; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100;
     color-scheme:light; }
   :root[data-theme="pink"] {
     --bg:#F7CACD; --panel:#FDFAF6; --text:#190B28; --muted:#6d5877; --accent:#AA4465; --on-accent:#fff;
     --control:#CEF9F2; --control-hover:#C6D8AF; --border:#C6D8AF; --well:#F9E1E2; --field:#ffffffe6; --chip:#CEF9F2;
     --rail:#AA446526; --rail-hover:#AA446540; --rail-label:#190B28; --scrim:#F7CACDcc;
-    --toast-bg:#190B28f2; --toast-fg:#FDFAF6; --toast-border:#AA4465;
-    --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#FDFAF6; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100;
+    --toast-bg:#190B28f2; --toast-fg:#FDFAF6; --toast-border:#AA4465; --bad-bg:#FDFAF6;
     color-scheme:light; }
   :root[data-theme="greyscale"] {
     --bg:#D4D4D4; --panel:#EDEDED; --text:#2B2B2B; --muted:#5c5c5c; --accent:#3A3A3A; --on-accent:#fff;
     --control:#fff; --control-hover:#e6e6e6; --border:#9E9E9E; --well:#dcdcdc; --field:#fafafae6; --chip:#cfcfcf;
     --rail:#2B2B2B1f; --rail-hover:#2B2B2B33; --rail-label:#2B2B2B; --scrim:#D4D4D4cc;
     --toast-bg:#2B2B2Bf2; --toast-fg:#FAFAFA; --toast-border:#555;
-    --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#f8d7d7; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100;
     color-scheme:light; }
   :root[data-theme="custom"] {
     --muted:color-mix(in srgb, var(--text) 60%, var(--bg)); --control:color-mix(in srgb, var(--text) 12%, var(--panel)); --control-hover:color-mix(in srgb, var(--text) 20%, var(--panel));
@@ -734,7 +735,7 @@ $('#hideDone').onchange = e => {
   updateCount();
 };
 document.addEventListener('keydown', e => {
-  if ($('#app').hidden || e.target.closest('select, input')) return;
+  if ($('#app').hidden || e.target.closest('select, input, #themePanel')) return;
   const k = e.key;
   if (k === 'ArrowDown' || k === 'PageDown' || k === 'j') { e.preventDefault(); go(1); }
   else if (k === 'ArrowUp' || k === 'PageUp' || k === 'k') { e.preventDefault(); go(-1); }
