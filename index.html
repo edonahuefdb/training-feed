@@ -549,6 +549,7 @@ function teardown() {
     try { player.destroy(); } catch {}
     player = null;
   }
+  clearTimeout(ttWatchdog);
   if (ttFrame) { ttFrame.remove(); ttFrame = null; }
   if (slides[activeIdx]) slides[activeIdx].classList.remove('live', 'paused');
   activeIdx = -1;
@@ -604,7 +605,7 @@ async function mountYT(slide, it) {
         logEvent('yt state', e.data, 'autoNext', settings.autoNext, 'hidden', document.hidden);
         slide.classList.add('live');
         slide.classList.toggle('paused', e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.CUED);
-        if (e.data === YT.PlayerState.ENDED) { store.set('pos:' + it.id, 0); if (settings.autoNext) autoNext(); }
+        if (e.data === YT.PlayerState.ENDED) ytFinished(p, it, 'ended event');
       },
       onError: e => {
         clearTimeout(readyTimer);
@@ -625,7 +626,24 @@ async function mountYT(slide, it) {
   });
   p.__itemId = it.id;
   player = p;
-  posTimer = setInterval(() => player && savePos(player), 5000);
+  // Shorts can loop instead of firing ENDED (seen when signed in to YouTube), so also watch the clock:
+  // reaching the last half-second, or jumping from the end back to the start, counts as finished.
+  let lastT = 0, ticks = 0;
+  posTimer = setInterval(() => {
+    if (player !== p || !p.getCurrentTime) return;
+    const t = p.getCurrentTime(), d = p.getDuration();
+    if (d > 0 && (t >= d - 0.5 || (lastT > d - 2 && t < 1.5))) ytFinished(p, it, t >= d - 0.5 ? 'reached end' : 'looped');
+    lastT = t;
+    if (++ticks % 10 === 0) savePos(p);
+  }, 500);
+}
+
+function ytFinished(p, it, why) {
+  if (p.__finished || player !== p) return;
+  p.__finished = true;
+  logEvent('yt finished', why);
+  store.set('pos:' + it.id, 0);
+  if (settings.autoNext) autoNext();
 }
 
 function mountTT(slide, it) {
@@ -635,21 +653,40 @@ function mountTT(slide, it) {
   f.allowFullscreen = true;
   slide.querySelector('.mount').replaceChildren(f);
   slide.classList.add('live');
-  ttFrame = f; ttLastTime = 0; ttEnded = false;
+  ttFrame = f; ttLastTime = 0; ttEnded = false; ttHeard = false; ttPlaying = false;
+  // TikTok sometimes shows a "Watch this video on TikTok" wall instead of the player; that page never
+  // talks to us. Treat silence as a failed embed so auto-next doesn't stall on it.
+  clearTimeout(ttWatchdog);
+  ttWatchdog = setTimeout(() => {
+    if (ttFrame !== f || visible[activeIdx] !== it) return;
+    if (!ttHeard) {
+      logEvent('tt silent, giving up');
+      it.media.failed = true;
+      clearTimeout(trackTimer);
+      ttFrame.remove(); ttFrame = null;
+      const frame = slide.querySelector('.frame');
+      if (frame) { frame.outerHTML = linkCard(it, 'TikTok wouldn\'t play this one inside the feed.'); wireCard(slide, it); }
+      if (autoArrived && settings.autoNext) autoNext();
+    } else if (!ttPlaying) {
+      f.contentWindow.postMessage({ type: 'play', 'x-tiktok-player': true }, 'https://www.tiktok.com');
+    }
+  }, 8000);
 }
 
 // TikTok's player reports its state by postMessage. It may loop instead of ending, so also treat
 // "time jumped from the last second back to the start" as the end.
-let ttLastTime = 0, ttEnded = false;
+let ttLastTime = 0, ttEnded = false, ttHeard = false, ttPlaying = false, ttWatchdog = null;
 window.addEventListener('message', e => {
   if (e.origin !== 'https://www.tiktok.com' || !ttFrame || e.source !== ttFrame.contentWindow) return;
   let d = e.data;
   if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
   if (!d || !d['x-tiktok-player']) return;
+  ttHeard = true;
+  if (d.type === 'onCurrentTime' || (d.type === 'onStateChange' && d.value === 1)) ttPlaying = true;
   let ended = d.type === 'onStateChange' && d.value === 0;
   if (d.type === 'onCurrentTime' && d.value) {
     const { currentTime: t, duration: dur } = d.value;
-    if (dur && ttLastTime > dur - 1.5 && t < 1) ended = true;
+    if (dur && (t >= dur - 0.6 || (ttLastTime > dur - 2 && t < 1.5))) ended = true;
     ttLastTime = t;
   }
   if (d.type === 'onStateChange') logEvent('tt state', d.value);
