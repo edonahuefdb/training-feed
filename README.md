@@ -34,3 +34,10 @@ Pick a theme from the **Theme** dropdown in the top bar (also on the setup scree
 - **Custom** shows an **Edit** button with four color pickers (background, panel, text, accent); everything else is derived from them. **Reset** restores the Dark colors.
 
 To add a theme, add a `:root[data-theme="<key>"]` block in `index.html` that sets every variable from the Dark `:root` block, then add `['<key>', '<Label>']` to `CHOICES` in the `Theme` script. The video area stays dark in every theme.
+
+## I'm bored mode
+
+The 🥱 **Bored** button on the rail puts Subway Surfers (Poki) on the left and a random clip from
+[this playlist](https://www.youtube.com/playlist?list=PLaZ3FaeraySnpAJOSTsFq0QHbQtSRnT9j) on the right,
+shuffled so each clip rolls into another random one. The training video keeps playing in the middle, muted,
+and still counts. Click the game before using the arrow keys. Click **Bored** again to turn it off and unmute.

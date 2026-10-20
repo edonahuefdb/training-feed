@@ -155,6 +155,24 @@ const Theme = (() => {
   #rail button small { font-size:10px; margin-top:3px; color:var(--rail-label); }
   #rail button.on { background:var(--accent); }
 
+  /* "I'm bored" mode: game on the left, random clip on the right, training muted in the middle. */
+  body { --side-w:28vw; --center-w:calc(44vw - 48px - 112px); }
+  .side { position:fixed; top:52px; bottom:12px; width:var(--side-w); z-index:15; display:none; flex-direction:column; justify-content:center; gap:8px; }
+  body.bored .side { display:flex; }
+  #boredLeft { left:12px; }
+  #boredRight { right:12px; }
+  .side .screen { position:relative; background:#000; border-radius:14px; overflow:hidden; box-shadow:0 10px 40px #0008; }
+  #boredLeft .screen { flex:1; }
+  #boredRight .screen { aspect-ratio:16/9; }
+  .side .screen > * { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .side .bar { display:flex; gap:8px; align-items:center; justify-content:center; color:var(--muted); font-size:13px; text-align:center; }
+  .side .bar #clipTitle { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  body.bored #feed { position:fixed; top:0; bottom:0; left:calc(var(--side-w) + 24px); right:calc(var(--side-w) + 24px); height:auto; }
+  body.bored #rail { right:calc(var(--side-w) + 24px); }
+  body.bored .frame.h { width:min(var(--center-w), calc((100vh - 190px) * 16 / 9)); }
+  body.bored .frame.v { height:min(calc(100vh - 170px), calc(var(--center-w) * 16 / 9)); }
+  body.bored .card, body.bored .caption { width:var(--center-w); }
+
   #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:var(--toast-bg); color:var(--toast-fg); border:1px solid var(--toast-border); padding:10px 16px;
            border-radius:10px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:80vw; text-align:center; }
   #toast.show { opacity:1; }
@@ -203,7 +221,16 @@ const Theme = (() => {
     <button id="speed" title="Playback speed (YouTube)">⏩<small>1x</small></button>
     <button id="auto" title="Automatically go to the next video when one ends">⤵<small>Auto</small></button>
     <button id="openOrig" title="Open the original page (O)">↗<small>Open</small></button>
+    <button id="bored" title="I'm bored: Subway Surfers on the left, random clips on the right, training keeps playing muted">🥱<small>Bored</small></button>
   </nav>
+  <aside class="side" id="boredLeft">
+    <div class="screen" id="gameBox"></div>
+    <div class="bar">🎮 Click the game, then use the arrow keys</div>
+  </aside>
+  <aside class="side" id="boredRight">
+    <div class="screen" id="clipBox"></div>
+    <div class="bar"><span id="clipTitle"></span><button class="btn" id="clipNext" title="Another random clip">🔀 Another</button></div>
+  </aside>
 </div>
 
 <div id="themePanel" hidden>
@@ -589,6 +616,7 @@ async function mountYT(slide, it) {
       onReady: e => {
         clearTimeout(readyTimer);
         try { e.target.setPlaybackRate(settings.rate); } catch {}
+        if (bored) e.target.mute();
         e.target.playVideo();
         slide.classList.add('live');
         // Chrome blocks autoplay with sound until you've clicked the page (scrolling doesn't count),
@@ -598,7 +626,7 @@ async function mountYT(slide, it) {
           const st = p.getPlayerState();
           if (st !== YT.PlayerState.PLAYING && st !== YT.PlayerState.BUFFERING && st !== YT.PlayerState.PAUSED) {
             p.mute(); p.playVideo();
-            toast('🔇 Playing muted. Click the video for sound.', 4000);
+            if (!bored) toast('🔇 Playing muted. Click the video for sound.', 4000);
           }
         }, 1500);
       },
@@ -683,6 +711,7 @@ window.addEventListener('message', e => {
   if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
   if (!d || !d['x-tiktok-player']) return;
   ttHeard = true;
+  if (d.type === 'onPlayerReady' && bored) muteTraining(true);
   if (d.type === 'onCurrentTime' || (d.type === 'onStateChange' && d.value === 1)) ttPlaying = true;
   let ended = d.type === 'onStateChange' && d.value === 0;
   if (d.type === 'onCurrentTime' && d.value) {
@@ -694,9 +723,68 @@ window.addEventListener('message', e => {
   if (ended && !ttEnded) { ttEnded = true; logEvent('tt ended'); if (settings.autoNext) autoNext(); }
 });
 
+/* ---------------- "I'm bored" mode ---------------- */
+const GAME_URL = 'https://games.poki.com/5dd312fa-015f-11ea-ad56-9cb6d0d995f7?site_id=3&iso_lang=en&country=US&device=desktop';
+const CLIP_PLAYLIST = 'PLaZ3FaeraySnpAJOSTsFq0QHbQtSRnT9j';
+let bored = false, clipPlayer = null;
+
+function setBored(on) {
+  bored = on;
+  document.body.classList.toggle('bored', on);
+  $('#bored').classList.toggle('on', on);
+  logEvent('bored', on);
+  if (on) {
+    const g = document.createElement('iframe');
+    g.src = GAME_URL;
+    g.allow = 'autoplay; fullscreen; gamepad; keyboard-map *; focus-without-user-activation *';
+    g.scrolling = 'no';
+    $('#gameBox').replaceChildren(g);
+    startClip();
+  } else {
+    $('#gameBox').replaceChildren();
+    if (clipPlayer) { try { clipPlayer.destroy(); } catch {} clipPlayer = null; }
+    $('#clipBox').replaceChildren();
+    $('#clipTitle').textContent = '';
+  }
+  muteTraining(on);
+}
+
+function muteTraining(on) {
+  try { if (player) on ? player.mute() : player.unMute(); } catch {}
+  if (ttFrame) ttFrame.contentWindow.postMessage({ type: on ? 'mute' : 'unMute', 'x-tiktok-player': true }, 'https://www.tiktok.com');
+}
+
+async function startClip() {
+  await ytReady;
+  if (!bored) return;
+  const el = document.createElement('div');
+  $('#clipBox').replaceChildren(el);
+  const p = new YT.Player(el, {
+    width: '100%', height: '100%',
+    playerVars: { listType: 'playlist', list: CLIP_PLAYLIST, playsinline: 1, rel: 0, origin: location.origin },
+    events: {
+      // Shuffle + loop so each clip that ends rolls into another random one.
+      onReady: () => { p.setShuffle(true); p.setLoop(true); randomClip(p, 0); },
+      onStateChange: e => { if (e.data === YT.PlayerState.PLAYING) $('#clipTitle').textContent = p.getVideoData().title || ''; },
+      onError: () => { if (clipPlayer === p) setTimeout(() => p.nextVideo(), 300); },
+    },
+  });
+  clipPlayer = p;
+}
+
+function randomClip(p, tries) {
+  if (clipPlayer !== p) return;
+  const list = p.getPlaylist && p.getPlaylist();
+  if (!list || !list.length) { if (tries < 20) setTimeout(() => randomClip(p, tries + 1), 300); return; }
+  p.playVideoAt(Math.floor(Math.random() * list.length));
+}
+
+$('#bored').onclick = () => setBored(!bored);
+$('#clipNext').onclick = () => clipPlayer && randomClip(clipPlayer, 0);
+
 function togglePlay() {
   if (!player || !player.getPlayerState) return;
-  if (player.isMuted && player.isMuted()) { player.unMute(); player.playVideo(); return; }
+  if (!bored && player.isMuted && player.isMuted()) { player.unMute(); player.playVideo(); return; }
   player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
 }
 
