@@ -125,7 +125,8 @@ const Theme = (() => {
   .frame img.thumb { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.55; }
   .frame .mount, .frame .mount > * { position:absolute; inset:0; width:100%; height:100%; border:0; }
   /* Transparent layer over the player (minus its control bar) so wheel/keys stay with the feed and a tap toggles play. */
-  .frame .tap { position:absolute; left:0; right:0; top:0; bottom:64px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  /* Leave a generous strip at the bottom so YouTube's progress bar and controls can be hovered and dragged. */
+  .frame .tap { position:absolute; left:0; right:0; top:0; bottom:clamp(110px, 22%, 180px); cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .frame .tap::after { content:"▶"; font-size:64px; color:#fffd; text-shadow:0 2px 12px #000; opacity:0; transition:opacity .15s; }
   .slide.paused .frame .tap::after, .slide:not(.live) .frame .tap::after { opacity:1; }
   .slide.live .frame img.thumb { display:none; }
