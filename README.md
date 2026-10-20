@@ -18,7 +18,7 @@ Each item counts on Pluralsight the same way clicking its link on the channel pa
 
 ## Usage
 
-1. Double-click `Start Training Feed.bat`. It runs `python -m http.server 8765 --bind 127.0.0.1` and opens the feed.
+1. Double-click `Start Training Feed.bat`. It runs `serve.py` (a no-cache server on 127.0.0.1:8765) and opens the feed.
 2. One time only: drag the **📚 Training Feed** button onto your bookmarks bar.
 3. Click **Open Pluralsight channel**, then click the bookmark on the channel page. Keep that tab open while you watch.
 

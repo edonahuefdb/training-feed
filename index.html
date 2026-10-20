@@ -140,6 +140,9 @@ const store = {
   set(k, v) { localStorage.setItem('psfeed:' + k, JSON.stringify(v)); },
 };
 const $ = s => document.querySelector(s);
+// Recent player/navigation events, for troubleshooting from DevTools: copy(feedLog)
+const feedLog = [];
+const logEvent = (...a) => { feedLog.push([new Date().toLocaleTimeString(), ...a]); if (feedLog.length > 300) feedLog.shift(); };
 const settings = { autoNext: store.get('autoNext', true), rate: store.get('rate', 1), hideDone: store.get('hideDone', false) };
 
 let psWin = null, channelId = null, channelName = '';
@@ -349,7 +352,10 @@ function build(focusId) {
   });
   slides.forEach((_, i) => updateBadge(i));
   observer = new IntersectionObserver(entries => {
-    entries.forEach(en => { if (en.isIntersecting && en.intersectionRatio >= 0.6) activate(+en.target.dataset.i); });
+    entries.forEach(en => {
+      const i = +en.target.dataset.i;
+      if (en.isIntersecting && en.intersectionRatio >= 0.6 && i !== activeIdx) { autoArrived = false; activate(i); }
+    });
   }, { root: feed, threshold: [0.6] });
   slides.forEach(s => observer.observe(s));
   const idx = Math.max(0, visible.findIndex(i => i.id === focusId));
@@ -417,6 +423,7 @@ function activate(i) {
   teardown();
   activeIdx = i;
   const it = visible[i], slide = slides[i];
+  logEvent('activate', i, it.media.kind, it.title);
   store.set('last:' + channelId, it.id);
   updateRail();
   if (it.media.kind === 'yt') mountYT(slide, it);
@@ -485,9 +492,10 @@ async function mountYT(slide, it) {
         }, 1500);
       },
       onStateChange: e => {
+        logEvent('yt state', e.data, 'autoNext', settings.autoNext, 'hidden', document.hidden);
         slide.classList.add('live');
         slide.classList.toggle('paused', e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.CUED);
-        if (e.data === YT.PlayerState.ENDED) { store.set('pos:' + it.id, 0); if (settings.autoNext) go(1); }
+        if (e.data === YT.PlayerState.ENDED) { store.set('pos:' + it.id, 0); if (settings.autoNext) autoNext(); }
       },
       onError: e => {
         clearTimeout(readyTimer);
@@ -496,8 +504,13 @@ async function mountYT(slide, it) {
                       153: 'YouTube refused the embed because the page sent no referrer (open the feed via Start Training Feed.bat, not by double-clicking index.html).' }[e.data]
                     || 'YouTube player error ' + e.data + '.';
         if (player === p) { try { p.destroy(); } catch {} player = null; }
-        if (visible[activeIdx] === it) clearTimeout(trackTimer);
+        it.media.failed = true;
+        logEvent('yt error', e.data);
         showFallback(slide, it, why);
+        if (visible[activeIdx] === it) {
+          clearTimeout(trackTimer);
+          if (autoArrived && settings.autoNext) autoNext();
+        }
       },
     },
   });
@@ -530,7 +543,8 @@ window.addEventListener('message', e => {
     if (dur && ttLastTime > dur - 1.5 && t < 1) ended = true;
     ttLastTime = t;
   }
-  if (ended && !ttEnded) { ttEnded = true; if (settings.autoNext) go(1); }
+  if (d.type === 'onStateChange') logEvent('tt state', d.value);
+  if (ended && !ttEnded) { ttEnded = true; logEvent('tt ended'); if (settings.autoNext) autoNext(); }
 });
 
 function togglePlay() {
@@ -568,13 +582,28 @@ function onTracked(d) {
 function refreshBadge(id) { const i = visible.findIndex(v => v.id === id); if (i >= 0) updateBadge(i); }
 
 /* ---------------- navigation & controls ---------------- */
-function go(delta) {
+const playable = it => it.media.kind !== 'link' && !it.media.failed;
+let autoArrived = false;
+
+// Called when a video finishes: skip cards (articles, things that can't embed) since they'd stall the run.
+function autoNext() {
+  let j = activeIdx + 1;
+  while (visible[j] && !playable(visible[j])) j++;
+  const skipped = j - activeIdx - 1;
+  if (!visible[j]) return go(1);
+  if (skipped) toast(`Skipped ${skipped} item${skipped > 1 ? 's' : ''} that can't play here (still in the feed to open later).`, 4000);
+  go(j - activeIdx, true);
+}
+
+function go(delta, auto = false) {
   const j = activeIdx + delta;
+  autoArrived = auto;
+  logEvent('go', delta, 'from', activeIdx, 'to', j, auto ? 'auto' : '');
   if (!slides[j]) { if (delta > 0) toast('That\'s the end of the channel 🎉', 2500); return; }
   // Activate directly: when the tab is in the background Chrome pauses the IntersectionObserver,
   // so waiting for it would leave auto-next stuck after the first video.
   activate(j);
-  slides[j].scrollIntoView({ behavior: document.hidden ? 'instant' : 'smooth', block: 'start' });
+  slides[j].scrollIntoView({ behavior: document.hidden || Math.abs(delta) > 1 ? 'instant' : 'smooth', block: 'start' });
 }
 function updateRail() {
   $('#speed').querySelector('small').textContent = settings.rate + 'x';
