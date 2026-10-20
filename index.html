@@ -5,11 +5,35 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Training Feed</title>
 <script>
-(function () {
-  var t; try { t = JSON.parse(localStorage.getItem('psfeed:theme')); } catch (e) {}
-  if (['dark', 'green', 'pink', 'greyscale', 'system'].indexOf(t) < 0) t = 'dark';
-  if (t === 'system') t = matchMedia('(prefers-color-scheme: light)').matches ? 'green' : 'dark';
-  document.documentElement.dataset.theme = t;
+const Theme = (() => {
+  const CHOICES = [['dark', 'Dark'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['greyscale', 'Greyscale'], ['system', 'System'], ['custom', 'Custom']];
+  const DEFAULT_COLORS = { bg: '#0b0b0f', panel: '#17171f', text: '#f2f2f5', accent: '#ff1675' };
+  const APPLIED = ['--bg', '--panel', '--text', '--accent', '--on-accent', 'color-scheme'];
+  const lightQuery = matchMedia('(prefers-color-scheme: light)');
+  const read = key => { try { return JSON.parse(localStorage.getItem('psfeed:' + key)); } catch { return null; } };
+  const write = (key, value) => localStorage.setItem('psfeed:' + key, JSON.stringify(value));
+  const brightness = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
+  const sanitize = c => Object.fromEntries(Object.keys(DEFAULT_COLORS).map(k => [k, /^#[0-9a-f]{6}$/i.test(c?.[k]) ? c[k] : DEFAULT_COLORS[k]]));
+  let choice = CHOICES.some(c => c[0] === read('theme')) ? read('theme') : 'dark';
+  let colors = sanitize(read('customColors'));
+  function apply() {
+    const root = document.documentElement;
+    root.dataset.theme = choice === 'system' ? (lightQuery.matches ? 'green' : 'dark') : choice;
+    APPLIED.forEach(v => root.style.removeProperty(v));
+    if (choice !== 'custom') return;
+    Object.entries(colors).forEach(([k, v]) => root.style.setProperty('--' + k, v));
+    root.style.setProperty('--on-accent', brightness(colors.accent) > 0.6 ? '#000' : '#fff');
+    root.style.setProperty('color-scheme', brightness(colors.bg) > 0.5 ? 'light' : 'dark');
+  }
+  lightQuery.addEventListener('change', () => { if (choice === 'system') apply(); });
+  apply();
+  return {
+    CHOICES, DEFAULT_COLORS,
+    get choice() { return choice; },
+    get colors() { return colors; },
+    setChoice(next) { if (!CHOICES.some(c => c[0] === next)) return; choice = next; write('theme', choice); apply(); },
+    setColors(next) { colors = sanitize(next); write('customColors', colors); apply(); },
+  };
 })();
 </script>
 <style>
@@ -39,6 +63,16 @@
     --toast-bg:#2B2B2Bf2; --toast-fg:#FAFAFA; --toast-border:#555;
     --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#f8d7d7; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100;
     color-scheme:light; }
+  :root[data-theme="custom"] {
+    --muted:color-mix(in srgb, var(--text) 60%, var(--bg)); --control:color-mix(in srgb, var(--text) 12%, var(--panel)); --control-hover:color-mix(in srgb, var(--text) 20%, var(--panel));
+    --border:color-mix(in srgb, var(--text) 25%, var(--panel)); --well:color-mix(in srgb, var(--text) 6%, var(--panel)); --field:color-mix(in srgb, var(--panel) 85%, transparent);
+    --chip:color-mix(in srgb, var(--text) 15%, var(--panel)); --rail:color-mix(in srgb, var(--text) 12%, transparent); --rail-hover:color-mix(in srgb, var(--text) 22%, transparent);
+    --rail-label:var(--text); --scrim:color-mix(in srgb, var(--bg) 80%, transparent);
+    --toast-bg:color-mix(in srgb, var(--panel) 95%, transparent); --toast-fg:var(--text); --toast-border:var(--border);
+    --ok-bg:color-mix(in srgb, #22c55e 25%, var(--panel)); --ok-fg:color-mix(in srgb, #22c55e 60%, var(--text));
+    --bad-bg:color-mix(in srgb, #ef4444 25%, var(--panel)); --bad-fg:color-mix(in srgb, #ef4444 60%, var(--text));
+    --done-bg:var(--ok-bg); --done-fg:var(--ok-fg);
+    --pending-bg:color-mix(in srgb, #f59e0b 25%, var(--panel)); --pending-fg:color-mix(in srgb, #f59e0b 60%, var(--text)); }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
   button, select { font:inherit; color:inherit; }
@@ -58,6 +92,13 @@
   .btn:hover { background:var(--control-hover); }
   .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600; }
   #setup .themeRow { margin-top:16px; display:flex; gap:8px; align-items:center; color:var(--muted); font-size:13px; }
+  .themeEdit { padding:5px 10px; font-size:13px; }
+  .themeEdit[hidden], #themePanel[hidden] { display:none; }
+  #themePanel { position:fixed; top:56px; right:16px; z-index:40; display:flex; flex-direction:column; gap:10px; padding:14px 16px; border-radius:12px;
+                background:var(--panel); border:1px solid var(--border); box-shadow:0 10px 40px #0006; }
+  #themePanel label { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  #themePanel input[type=color] { width:44px; height:28px; padding:0; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; }
+  #themePanel .row { display:flex; gap:8px; justify-content:flex-end; }
   #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:var(--well); color:var(--muted); font-size:13px; }
 
   /* ---------- feed ---------- */
@@ -138,7 +179,7 @@
       </li>
     </ol>
     <div class="status" id="setupStatus">Waiting for the Pluralsight tab…</div>
-    <label class="themeRow">Theme <select class="theme" title="Theme"></select></label>
+    <label class="themeRow">Theme <select class="theme" title="Theme"></select> <button class="btn themeEdit" hidden>Edit</button></label>
   </div>
 </div>
 
@@ -150,6 +191,7 @@
     <select id="jump" title="Jump to"></select>
     <label title="Only show items that haven't counted yet"><input type="checkbox" id="hideDone"> Hide done</label>
     <select class="theme" title="Theme"></select>
+    <button class="btn themeEdit" hidden>Edit</button>
     <span id="conn">● Connected</span>
   </header>
   <main id="feed"></main>
@@ -160,6 +202,14 @@
     <button id="auto" title="Automatically go to the next video when one ends">⤵<small>Auto</small></button>
     <button id="openOrig" title="Open the original page (O)">↗<small>Open</small></button>
   </nav>
+</div>
+
+<div id="themePanel" hidden>
+  <label>Background <input type="color" data-key="bg"></label>
+  <label>Panel <input type="color" data-key="panel"></label>
+  <label>Text <input type="color" data-key="text"></label>
+  <label>Accent <input type="color" data-key="accent"></label>
+  <div class="row"><button class="btn" id="themeReset">Reset</button><button class="btn" id="themeDone">Done</button></div>
 </div>
 
 <div id="toast"></div>
@@ -179,22 +229,28 @@ const $ = s => document.querySelector(s);
 // Recent player/navigation events, for troubleshooting from DevTools: copy(feedLog)
 const feedLog = [];
 const logEvent = (...a) => { feedLog.push([new Date().toLocaleTimeString(), ...a]); if (feedLog.length > 300) feedLog.shift(); };
-const THEMES = [['dark', 'Dark'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['greyscale', 'Greyscale'], ['system', 'System']];
-const lightQuery = matchMedia('(prefers-color-scheme: light)');
-let themeChoice = THEMES.some(t => t[0] === store.get('theme', 'dark')) ? store.get('theme', 'dark') : 'dark';
-function applyTheme() {
-  document.documentElement.dataset.theme = themeChoice === 'system' ? (lightQuery.matches ? 'green' : 'dark') : themeChoice;
-  document.querySelectorAll('select.theme').forEach(s => { s.value = themeChoice; });
+const themeEdits = document.querySelectorAll('.themeEdit');
+const themePanel = $('#themePanel');
+function syncThemeUi() {
+  document.querySelectorAll('select.theme').forEach(s => { s.value = Theme.choice; });
+  themeEdits.forEach(b => { b.hidden = Theme.choice !== 'custom'; });
+  if (Theme.choice !== 'custom') themePanel.hidden = true;
 }
+function syncThemeInputs() { themePanel.querySelectorAll('input[type=color]').forEach(i => { i.value = Theme.colors[i.dataset.key]; }); }
 document.querySelectorAll('select.theme').forEach(s => {
-  THEMES.forEach(([key, label]) => s.add(new Option(label, key)));
+  Theme.CHOICES.forEach(([key, label]) => s.add(new Option(label, key)));
   s.onchange = e => {
-    themeChoice = e.target.value; store.set('theme', themeChoice); applyTheme(); e.target.blur();
-    toast('Theme: ' + THEMES.find(t => t[0] === themeChoice)[1], 1200);
+    Theme.setChoice(e.target.value); syncThemeUi(); e.target.blur();
+    if (Theme.choice === 'custom') { syncThemeInputs(); themePanel.hidden = false; }
+    toast('Theme: ' + Theme.CHOICES.find(c => c[0] === Theme.choice)[1], 1200);
   };
 });
-lightQuery.addEventListener('change', () => { if (themeChoice === 'system') applyTheme(); });
-applyTheme();
+themeEdits.forEach(b => { b.onclick = () => { syncThemeInputs(); themePanel.hidden = !themePanel.hidden; }; });
+themePanel.querySelectorAll('input[type=color]').forEach(i => { i.oninput = () => Theme.setColors({ ...Theme.colors, [i.dataset.key]: i.value }); });
+$('#themeReset').onclick = () => { Theme.setColors(Theme.DEFAULT_COLORS); syncThemeInputs(); };
+$('#themeDone').onclick = () => { themePanel.hidden = true; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') themePanel.hidden = true; });
+syncThemeUi();
 const settings = { autoNext: store.get('autoNext', true), rate: store.get('rate', 1), hideDone: store.get('hideDone', false) };
 
 let psWin = null, channelId = null, channelName = '';
