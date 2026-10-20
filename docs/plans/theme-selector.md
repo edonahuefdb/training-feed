@@ -69,9 +69,9 @@ Contract / behavior:
 - `README.md` gets a short Themes section covering the selector, the available themes, and how to add one (a new `[data-theme]` block setting every variable).
 
 Tasks:
-- [ ] Add the Edit button and four-input panel with live preview
-- [ ] Persist and restore custom colors, including in the head script
-- [ ] Add the README Themes section
+- [x] Add the Edit button and four-input panel with live preview
+- [x] Persist and restore custom colors, including in the head script
+- [x] Add the README Themes section
 
 Acceptance:
 - Editing a color changes the page live and survives reload
