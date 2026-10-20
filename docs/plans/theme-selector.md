@@ -33,19 +33,19 @@ What exists today:
 - The keydown handler skips events whose target is inside `select, input`.
 
 Contract / behavior:
-- `<html data-theme="...">` selects a palette. Values: `dark` (default), `day`, `night`, `greyscale`, `system`, `custom`.
+- `<html data-theme="...">` holds the resolved palette: `dark` (default), `day`, `night`, `greyscale`, or `custom`. The saved choice can also be `system`.
 - `day`, `night`, and `greyscale` take their core colors from the dashboard's `:root`, `night`, and `greyscale` blocks, mapped as: `--header` to `--panel`, `--background` to `--bg`, `--accent` to `--accent`, `--surface` to `--control`, `--highlight` to `--text` for dark themes. Each theme sets every variable from Phase 1.
-- `system` resolves to `dark` or `day` from `prefers-color-scheme` and follows live changes.
+- `system` resolves to `dark` or `day` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
 - The choice is stored as `psfeed:theme`. A small inline script in `<head>` reads it and sets `data-theme` before the stylesheet paints, so there is no flash.
 - A `select#theme` in `#top` and a second `select` in the setup `.box` stay in sync. Changing either applies the theme at once.
 - An unknown stored value falls back to `dark`.
-- `<meta name="color-scheme">` follows the theme so native controls (select, color input) match.
+- Each palette sets CSS `color-scheme` (`dark` or `light`) so native controls (select, color input, scrollbars) match.
 
 Tasks:
-- [ ] Add `[data-theme]` palette blocks for `day`, `night`, `greyscale`
-- [ ] Add the head script and the `system` resolver
-- [ ] Add both selects and one `setTheme` function that updates `data-theme`, storage, and both selects
-- [ ] Add a toast on change, like the speed button
+- [x] Add `[data-theme]` palette blocks for `day`, `night`, `greyscale`
+- [x] Add the head script and the `system` resolver
+- [x] Add both selects and one `setTheme` function that updates `data-theme`, storage, and both selects
+- [x] Add a toast on change, like the speed button
 
 Gate: Judge the Day, Night, and Greyscale looks in the feed and setup screen. Bring screenshots or the live page.
 
