@@ -4,8 +4,76 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Training Feed</title>
+<script>
+const Theme = (() => {
+  const CHOICES = [['system', 'System'], ['dark', 'Dark'], ['greyscale', 'Light Mode'], ['green', 'Green Light'], ['pink', 'Pink Light'], ['custom', 'Custom']];
+  // Must match the Dark :root values; this script runs before the stylesheet.
+  const DEFAULT_COLORS = { bg: '#0b0b0f', panel: '#17171f', text: '#f2f2f5', accent: '#ff1675' };
+  const APPLIED = ['--bg', '--panel', '--text', '--accent', '--on-accent', 'color-scheme'];
+  const lightQuery = matchMedia('(prefers-color-scheme: light)');
+  const read = key => { try { return JSON.parse(localStorage.getItem('psfeed:' + key)); } catch { return null; } };
+  const write = (key, value) => { try { localStorage.setItem('psfeed:' + key, JSON.stringify(value)); } catch {} };
+  const brightness = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
+  const sanitize = c => Object.fromEntries(Object.keys(DEFAULT_COLORS).map(k => [k, /^#[0-9a-f]{6}$/i.test(c?.[k]) ? c[k] : DEFAULT_COLORS[k]]));
+  const saved = read('theme');
+  let choice = CHOICES.some(c => c[0] === saved) ? saved : 'dark';
+  let colors = sanitize(read('customColors'));
+  function apply() {
+    const root = document.documentElement;
+    root.dataset.theme = choice === 'system' ? (lightQuery.matches ? 'greyscale' : 'dark') : choice;
+    APPLIED.forEach(v => root.style.removeProperty(v));
+    if (choice !== 'custom') return;
+    Object.entries(colors).forEach(([k, v]) => root.style.setProperty('--' + k, v));
+    root.style.setProperty('--on-accent', brightness(colors.accent) > 0.6 ? '#000' : '#fff');
+    root.style.setProperty('color-scheme', brightness(colors.bg) > 0.5 ? 'light' : 'dark');
+  }
+  lightQuery.addEventListener('change', () => { if (choice === 'system') apply(); });
+  apply();
+  return {
+    CHOICES, DEFAULT_COLORS,
+    get choice() { return choice; },
+    get colors() { return colors; },
+    setChoice(next) { if (!CHOICES.some(c => c[0] === next)) return; choice = next; write('theme', choice); apply(); },
+    setColors(next) { colors = sanitize(next); write('customColors', colors); apply(); },
+  };
+})();
+</script>
 <style>
-  :root { --bg:#0b0b0f; --panel:#17171f; --text:#f2f2f5; --muted:#9a9aa8; --accent:#ff1675; --ok:#22c55e; --warn:#f59e0b; }
+  :root { --bg:#0b0b0f; --panel:#17171f; --text:#f2f2f5; --muted:#9a9aa8; --accent:#ff1675; --ok:#22c55e; --warn:#f59e0b;
+          --on-accent:#fff; --control:#2a2a36; --control-hover:#34344a; --border:#3a3a48; --well:#20202a; --field:#20202acc; --chip:#33333f;
+          --rail:#ffffff1f; --rail-hover:#ffffff33; --rail-label:#ddd; --scrim:#000c; --toast-bg:#000d; --toast-fg:#f2f2f5; --toast-border:#333;
+          --ok-bg:#1f3a2a; --ok-fg:#9be7b4; --bad-bg:#4a1f1f; --bad-fg:#ffb4b4; --done-bg:#173a25; --done-fg:#86efac; --pending-bg:#3a3217; --pending-fg:#fcd34d;
+          color-scheme:dark; }
+  :root[data-theme="green"], :root[data-theme="pink"], :root[data-theme="greyscale"] {
+    --ok-bg:#cdeed6; --ok-fg:#1b5e3a; --bad-bg:#f8d7d7; --bad-fg:#8a2020; --done-bg:#cdeed6; --done-fg:#1b5e3a; --pending-bg:#fdeeb8; --pending-fg:#8a6100; }
+  :root[data-theme="green"] {
+    --bg:#E4F1E8; --panel:#F5FBF6; --text:#163A2A; --muted:#4a6b59; --accent:#2F6F4E; --on-accent:#fff;
+    --control:#BFE8C8; --control-hover:#A8D5BA; --border:#A8D5BA; --well:#E4F1E8; --field:#ffffffe6; --chip:#BFE8C8;
+    --rail:#2F6F4E26; --rail-hover:#2F6F4E40; --rail-label:#163A2A; --scrim:#E4F1E8cc;
+    --toast-bg:#163A2Af2; --toast-fg:#F5FBF6; --toast-border:#2F6F4E;
+    color-scheme:light; }
+  :root[data-theme="pink"] {
+    --bg:#F7CACD; --panel:#FDFAF6; --text:#190B28; --muted:#6d5877; --accent:#AA4465; --on-accent:#fff;
+    --control:#CEF9F2; --control-hover:#C6D8AF; --border:#C6D8AF; --well:#F9E1E2; --field:#ffffffe6; --chip:#CEF9F2;
+    --rail:#AA446526; --rail-hover:#AA446540; --rail-label:#190B28; --scrim:#F7CACDcc;
+    --toast-bg:#190B28f2; --toast-fg:#FDFAF6; --toast-border:#AA4465; --bad-bg:#FDFAF6;
+    color-scheme:light; }
+  :root[data-theme="greyscale"] {
+    --bg:#D4D4D4; --panel:#EDEDED; --text:#2B2B2B; --muted:#5c5c5c; --accent:#3A3A3A; --on-accent:#fff;
+    --control:#fff; --control-hover:#e6e6e6; --border:#9E9E9E; --well:#dcdcdc; --field:#fafafae6; --chip:#cfcfcf;
+    --rail:#2B2B2B1f; --rail-hover:#2B2B2B33; --rail-label:#2B2B2B; --scrim:#D4D4D4cc;
+    --toast-bg:#2B2B2Bf2; --toast-fg:#FAFAFA; --toast-border:#555;
+    color-scheme:light; }
+  :root[data-theme="custom"] {
+    --muted:color-mix(in srgb, var(--text) 60%, var(--bg)); --control:color-mix(in srgb, var(--text) 12%, var(--panel)); --control-hover:color-mix(in srgb, var(--text) 20%, var(--panel));
+    --border:color-mix(in srgb, var(--text) 25%, var(--panel)); --well:color-mix(in srgb, var(--text) 6%, var(--panel)); --field:color-mix(in srgb, var(--panel) 85%, transparent);
+    --chip:color-mix(in srgb, var(--text) 15%, var(--panel)); --rail:color-mix(in srgb, var(--text) 12%, transparent); --rail-hover:color-mix(in srgb, var(--text) 22%, transparent);
+    --rail-label:var(--text); --scrim:color-mix(in srgb, var(--bg) 80%, transparent);
+    --toast-bg:color-mix(in srgb, var(--panel) 95%, transparent); --toast-fg:var(--text); --toast-border:var(--border);
+    --ok-bg:color-mix(in srgb, #22c55e 25%, var(--panel)); --ok-fg:color-mix(in srgb, #22c55e 60%, var(--text));
+    --bad-bg:color-mix(in srgb, #ef4444 25%, var(--panel)); --bad-fg:color-mix(in srgb, #ef4444 60%, var(--text));
+    --done-bg:var(--ok-bg); --done-fg:var(--ok-fg);
+    --pending-bg:color-mix(in srgb, #f59e0b 25%, var(--panel)); --pending-fg:color-mix(in srgb, #f59e0b 60%, var(--text)); }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
   button, select { font:inherit; color:inherit; }
@@ -20,24 +88,32 @@
   #setup li { margin:0 0 20px; }
   #setup li b { display:block; margin-bottom:6px; }
   #setup .hint { color:var(--muted); font-size:13px; margin-top:6px; }
-  .bm { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; cursor:grab; }
-  .btn { display:inline-block; padding:8px 14px; border-radius:8px; background:#2a2a36; border:1px solid #3a3a48; cursor:pointer; text-decoration:none; }
-  .btn:hover { background:#34344a; }
-  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:#20202a; color:var(--muted); font-size:13px; }
+  .bm { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--accent); color:var(--on-accent); text-decoration:none; font-weight:600; cursor:grab; }
+  .btn { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--control); border:1px solid var(--border); cursor:pointer; text-decoration:none; }
+  .btn:hover { background:var(--control-hover); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600; }
+  #setup .themeRow { margin-top:16px; display:flex; gap:8px; align-items:center; color:var(--muted); font-size:13px; }
+  .themeEdit { padding:5px 10px; font-size:13px; }
+  .themeEdit[hidden], #themePanel[hidden] { display:none; }
+  #themePanel { position:fixed; top:56px; right:16px; z-index:40; display:flex; flex-direction:column; gap:10px; padding:14px 16px; border-radius:12px;
+                background:var(--panel); border:1px solid var(--border); box-shadow:0 10px 40px #0006; }
+  #themePanel label { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  #themePanel input[type=color] { width:44px; height:28px; padding:0; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; }
+  #themePanel .row { display:flex; gap:8px; justify-content:flex-end; }
+  #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:var(--well); color:var(--muted); font-size:13px; }
 
   /* ---------- feed ---------- */
   #app { height:100%; }
   #top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; gap:12px; align-items:center; padding:10px 16px;
-         background:linear-gradient(#000c, #0000); pointer-events:none; }
+         background:linear-gradient(var(--scrim), transparent); pointer-events:none; }
   #top > * { pointer-events:auto; }
   #top .name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; }
   #top .count { color:var(--muted); white-space:nowrap; }
   #top .spacer { flex:1; }
-  #top select { background:#20202acc; border:1px solid #3a3a48; border-radius:8px; padding:5px 8px; max-width:260px; }
+  #top select, #setup select { background:var(--field); border:1px solid var(--border); border-radius:8px; padding:5px 8px; max-width:260px; }
   #top label { display:flex; gap:6px; align-items:center; color:var(--muted); white-space:nowrap; cursor:pointer; }
-  #conn { font-size:13px; padding:4px 10px; border-radius:999px; background:#1f3a2a; color:#9be7b4; white-space:nowrap; }
-  #conn.off { background:#4a1f1f; color:#ffb4b4; cursor:pointer; }
+  #conn { font-size:13px; padding:4px 10px; border-radius:999px; background:var(--ok-bg); color:var(--ok-fg); white-space:nowrap; }
+  #conn.off { background:var(--bad-bg); color:var(--bad-fg); cursor:pointer; }
 
   #feed { height:100%; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; }
   #feed::-webkit-scrollbar { display:none; }
@@ -67,18 +143,18 @@
   .caption .meta { color:var(--muted); font-size:13px; }
   .caption h2 { margin:2px 0 4px; font-size:18px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .caption .tags { color:var(--muted); font-size:13px; display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; }
-  .badge { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; background:#33333f; color:var(--muted); }
-  .badge.done { background:#173a25; color:#86efac; }
-  .badge.pending { background:#3a3217; color:#fcd34d; }
+  .badge { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; background:var(--chip); color:var(--muted); }
+  .badge.done { background:var(--done-bg); color:var(--done-fg); }
+  .badge.pending { background:var(--pending-bg); color:var(--pending-fg); }
 
   #rail { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:20; display:flex; flex-direction:column; gap:12px; }
-  #rail button { width:56px; height:56px; border-radius:50%; border:0; background:#ffffff1f; cursor:pointer; font-size:20px; display:flex; flex-direction:column;
+  #rail button { width:56px; height:56px; border-radius:50%; border:0; background:var(--rail); cursor:pointer; font-size:20px; display:flex; flex-direction:column;
                  align-items:center; justify-content:center; line-height:1; }
-  #rail button:hover { background:#ffffff33; }
-  #rail button small { font-size:10px; margin-top:3px; color:#ddd; }
+  #rail button:hover { background:var(--rail-hover); }
+  #rail button small { font-size:10px; margin-top:3px; color:var(--rail-label); }
   #rail button.on { background:var(--accent); }
 
-  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:#000d; border:1px solid #333; padding:10px 16px;
+  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:var(--toast-bg); color:var(--toast-fg); border:1px solid var(--toast-border); padding:10px 16px;
            border-radius:10px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:80vw; text-align:center; }
   #toast.show { opacity:1; }
   .empty { height:100vh; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:18px; }
@@ -104,6 +180,7 @@
       </li>
     </ol>
     <div class="status" id="setupStatus">Waiting for the Pluralsight tab…</div>
+    <label class="themeRow">Theme <select class="theme" title="Theme"></select> <button class="btn themeEdit" hidden>Edit</button></label>
   </div>
 </div>
 
@@ -114,6 +191,8 @@
     <span class="spacer"></span>
     <select id="jump" title="Jump to"></select>
     <label title="Only show items that haven't counted yet"><input type="checkbox" id="hideDone"> Hide done</label>
+    <select class="theme" title="Theme"></select>
+    <button class="btn themeEdit" hidden>Edit</button>
     <span id="conn">● Connected</span>
   </header>
   <main id="feed"></main>
@@ -124,6 +203,14 @@
     <button id="auto" title="Automatically go to the next video when one ends">⤵<small>Auto</small></button>
     <button id="openOrig" title="Open the original page (O)">↗<small>Open</small></button>
   </nav>
+</div>
+
+<div id="themePanel" hidden>
+  <label>Background <input type="color" data-key="bg"></label>
+  <label>Panel <input type="color" data-key="panel"></label>
+  <label>Text <input type="color" data-key="text"></label>
+  <label>Accent <input type="color" data-key="accent"></label>
+  <div class="row"><button class="btn" id="themeReset">Reset</button><button class="btn" id="themeDone">Done</button></div>
 </div>
 
 <div id="toast"></div>
@@ -143,6 +230,28 @@ const $ = s => document.querySelector(s);
 // Recent player/navigation events, for troubleshooting from DevTools: copy(feedLog)
 const feedLog = [];
 const logEvent = (...a) => { feedLog.push([new Date().toLocaleTimeString(), ...a]); if (feedLog.length > 300) feedLog.shift(); };
+const themeEdits = document.querySelectorAll('.themeEdit');
+const themePanel = $('#themePanel');
+function syncThemeUi() {
+  document.querySelectorAll('select.theme').forEach(s => { s.value = Theme.choice; });
+  themeEdits.forEach(b => { b.hidden = Theme.choice !== 'custom'; });
+  if (Theme.choice !== 'custom') themePanel.hidden = true;
+}
+function syncThemeInputs() { themePanel.querySelectorAll('input[type=color]').forEach(i => { i.value = Theme.colors[i.dataset.key]; }); }
+document.querySelectorAll('select.theme').forEach(s => {
+  Theme.CHOICES.forEach(([key, label]) => s.add(new Option(label, key)));
+  s.onchange = e => {
+    Theme.setChoice(e.target.value); syncThemeUi(); e.target.blur();
+    if (Theme.choice === 'custom') { syncThemeInputs(); themePanel.hidden = false; }
+    toast('Theme: ' + Theme.CHOICES.find(c => c[0] === Theme.choice)[1], 1200);
+  };
+});
+themeEdits.forEach(b => { b.onclick = () => { syncThemeInputs(); themePanel.hidden = !themePanel.hidden; }; });
+themePanel.querySelectorAll('input[type=color]').forEach(i => { i.oninput = () => Theme.setColors({ ...Theme.colors, [i.dataset.key]: i.value }); });
+$('#themeReset').onclick = () => { Theme.setColors(Theme.DEFAULT_COLORS); syncThemeInputs(); };
+$('#themeDone').onclick = () => { themePanel.hidden = true; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') themePanel.hidden = true; });
+syncThemeUi();
 const settings = { autoNext: store.get('autoNext', true), rate: store.get('rate', 1), hideDone: store.get('hideDone', false) };
 
 let psWin = null, channelId = null, channelName = '';
@@ -626,7 +735,7 @@ $('#hideDone').onchange = e => {
   updateCount();
 };
 document.addEventListener('keydown', e => {
-  if ($('#app').hidden || e.target.closest('select, input')) return;
+  if ($('#app').hidden || e.target.closest('select, input, #themePanel')) return;
   const k = e.key;
   if (k === 'ArrowDown' || k === 'PageDown' || k === 'j') { e.preventDefault(); go(1); }
   else if (k === 'ArrowUp' || k === 'PageUp' || k === 'k') { e.preventDefault(); go(-1); }

@@ -24,3 +24,13 @@ Each item counts on Pluralsight the same way clicking its link on the channel pa
 
 Keys: ↑/↓ or J/K to move between items, Space to play/pause, O to open the original page.
 Use the rail on the right for playback speed (YouTube) and auto-next.
+
+## Themes
+
+Pick a theme from the **Theme** dropdown in the top bar (also on the setup screen). The choice is saved in the browser and applied before the page paints.
+
+- **Dark** (default), **Light Mode**, **Green Light**, **Pink Light**
+- **System** follows the OS light/dark setting (light resolves to Light Mode)
+- **Custom** shows an **Edit** button with four color pickers (background, panel, text, accent); everything else is derived from them. **Reset** restores the Dark colors.
+
+To add a theme, add a `:root[data-theme="<key>"]` block in `index.html` that sets every variable from the Dark `:root` block, then add `['<key>', '<Label>']` to `CHOICES` in the `Theme` script. The video area stays dark in every theme.
