@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Training Feed</title>
+<style>
+  :root { --bg:#0b0b0f; --panel:#17171f; --text:#f2f2f5; --muted:#9a9aa8; --accent:#ff1675; --ok:#22c55e; --warn:#f59e0b; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
+  button, select { font:inherit; color:inherit; }
+  a { color:inherit; }
+
+  /* ---------- setup screen ---------- */
+  #setup { height:100%; overflow:auto; display:flex; align-items:center; justify-content:center; padding:24px; }
+  #setup .box { max-width:640px; background:var(--panel); border-radius:16px; padding:32px 36px; }
+  #setup h1 { margin:0 0 6px; font-size:26px; }
+  #setup p.sub { margin:0 0 24px; color:var(--muted); }
+  #setup ol { padding-left:22px; margin:0; }
+  #setup li { margin:0 0 20px; }
+  #setup li b { display:block; margin-bottom:6px; }
+  #setup .hint { color:var(--muted); font-size:13px; margin-top:6px; }
+  .bm { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; cursor:grab; }
+  .btn { display:inline-block; padding:8px 14px; border-radius:8px; background:#2a2a36; border:1px solid #3a3a48; cursor:pointer; text-decoration:none; }
+  .btn:hover { background:#34344a; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:#20202a; color:var(--muted); font-size:13px; }
+
+  /* ---------- feed ---------- */
+  #app { height:100%; }
+  #top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; gap:12px; align-items:center; padding:10px 16px;
+         background:linear-gradient(#000c, #0000); pointer-events:none; }
+  #top > * { pointer-events:auto; }
+  #top .name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; }
+  #top .count { color:var(--muted); white-space:nowrap; }
+  #top .spacer { flex:1; }
+  #top select { background:#20202acc; border:1px solid #3a3a48; border-radius:8px; padding:5px 8px; max-width:260px; }
+  #top label { display:flex; gap:6px; align-items:center; color:var(--muted); white-space:nowrap; cursor:pointer; }
+  #conn { font-size:13px; padding:4px 10px; border-radius:999px; background:#1f3a2a; color:#9be7b4; white-space:nowrap; }
+  #conn.off { background:#4a1f1f; color:#ffb4b4; cursor:pointer; }
+
+  #feed { height:100%; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; }
+  #feed::-webkit-scrollbar { display:none; }
+  .slide { height:100vh; scroll-snap-align:start; scroll-snap-stop:always; display:flex; flex-direction:column; align-items:center; justify-content:center;
+           padding:56px 96px 16px 16px; gap:12px; position:relative; }
+  .frame { position:relative; background:#000; border-radius:14px; overflow:hidden; flex:none; box-shadow:0 10px 40px #0008; }
+  .frame.v { height:calc(100vh - 170px); aspect-ratio:9/16; }
+  .frame.h { width:min(calc(100vw - 140px), calc((100vh - 190px) * 16 / 9)); aspect-ratio:16/9; }
+  .frame img.thumb { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.55; }
+  .frame .mount, .frame .mount > * { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  /* Transparent layer over the player (minus its control bar) so wheel/keys stay with the feed and a tap toggles play. */
+  .frame .tap { position:absolute; left:0; right:0; top:0; bottom:64px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .frame .tap::after { content:"▶"; font-size:64px; color:#fffd; text-shadow:0 2px 12px #000; opacity:0; transition:opacity .15s; }
+  .slide.paused .frame .tap::after, .slide:not(.live) .frame .tap::after { opacity:1; }
+  .slide.live .frame img.thumb { display:none; }
+  .frame .pstatus { position:absolute; left:0; right:0; bottom:72px; text-align:center; color:#fff; font-size:14px; text-shadow:0 1px 6px #000; padding:0 16px; pointer-events:none; }
+  .slide.live .frame .pstatus { display:none; }
+
+  .card { width:min(560px, calc(100vw - 140px)); background:var(--panel); border-radius:16px; padding:32px; text-align:center; }
+  .card .icon { font-size:56px; }
+  .card h3 { margin:10px 0 8px; font-size:22px; }
+  .card p { color:var(--muted); margin:8px 0; }
+  .card .btn { margin-top:12px; font-size:17px; padding:10px 20px; }
+  .card .tip { font-size:13px; margin-top:18px; }
+
+  .caption { width:min(760px, calc(100vw - 140px)); text-align:center; }
+  .caption .meta { color:var(--muted); font-size:13px; }
+  .caption h2 { margin:2px 0 4px; font-size:18px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .caption .tags { color:var(--muted); font-size:13px; display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  .badge { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; background:#33333f; color:var(--muted); }
+  .badge.done { background:#173a25; color:#86efac; }
+  .badge.pending { background:#3a3217; color:#fcd34d; }
+
+  #rail { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:20; display:flex; flex-direction:column; gap:12px; }
+  #rail button { width:56px; height:56px; border-radius:50%; border:0; background:#ffffff1f; cursor:pointer; font-size:20px; display:flex; flex-direction:column;
+                 align-items:center; justify-content:center; line-height:1; }
+  #rail button:hover { background:#ffffff33; }
+  #rail button small { font-size:10px; margin-top:3px; color:#ddd; }
+  #rail button.on { background:var(--accent); }
+
+  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:#000d; border:1px solid #333; padding:10px 16px;
+           border-radius:10px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:80vw; text-align:center; }
+  #toast.show { opacity:1; }
+  .empty { height:100vh; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:18px; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div class="box">
+    <h1>📚 Training Feed</h1>
+    <p class="sub">Scroll through your Pluralsight channel's videos and articles back to back. Each item counts on Pluralsight the same way clicking its link on the channel page does.</p>
+    <ol>
+      <li><b>One-time setup: drag this button onto your bookmarks bar</b>
+        <a id="bm" class="bm" href="#" onclick="alert('Drag this button onto your bookmarks bar instead of clicking it.');return false;">📚 Training Feed</a>
+        <div class="hint">If you don't see the bookmarks bar, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>.</div>
+      </li>
+      <li><b>Open your Pluralsight channel</b>
+        <a id="openPs" class="btn" href="#">Open Pluralsight channel ↗</a>
+        <div class="hint">Sign in if it asks. Keep that tab open while you watch, because it's what records your progress.</div>
+      </li>
+      <li><b>On the Pluralsight channel page, click the 📚 Training Feed bookmark.</b>
+        <div class="hint">The feed loads here, starting at the first item you haven't done yet.</div>
+      </li>
+    </ol>
+    <div class="status" id="setupStatus">Waiting for the Pluralsight tab…</div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header id="top">
+    <span class="name" id="chName"></span>
+    <span class="count" id="count"></span>
+    <span class="spacer"></span>
+    <select id="jump" title="Jump to"></select>
+    <label title="Only show items that haven't counted yet"><input type="checkbox" id="hideDone"> Hide done</label>
+    <span id="conn">● Connected</span>
+  </header>
+  <main id="feed"></main>
+  <nav id="rail">
+    <button id="prev" title="Previous (↑ / K)">▲</button>
+    <button id="next" title="Next (↓ / J)">▼</button>
+    <button id="speed" title="Playback speed (YouTube)">⏩<small>1x</small></button>
+    <button id="auto" title="Automatically go to the next video when one ends">⤵<small>Auto</small></button>
+    <button id="openOrig" title="Open the original page (O)">↗<small>Open</small></button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const PS_ORIGIN = 'https://app.pluralsight.com';
+const DEFAULT_CHANNEL_URL = 'https://app.pluralsight.com/channels/details/157bfe7b-0ccd-4fe2-a730-5f60d941e56c';
+const VIEW_SECONDS_BEFORE_COUNTING = 3;
+const RATES = [1, 1.25, 1.5, 1.75, 2];
+
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem('psfeed:' + k)); return v ?? d; } catch { return d; } },
+  set(k, v) { localStorage.setItem('psfeed:' + k, JSON.stringify(v)); },
+};
+const $ = s => document.querySelector(s);
+const settings = { autoNext: store.get('autoNext', true), rate: store.get('rate', 1), hideDone: store.get('hideDone', false) };
+
+let psWin = null, channelId = null, channelName = '';
+let items = [], visible = [], slides = [], done = new Set(), pending = new Map();
+let activeIdx = -1, player = null, ttFrame = null, trackTimer = null, posTimer = null, observer = null;
+
+/* ======================================================================
+   Bookmarklet: runs on the Pluralsight channel page. It answers the feed's
+   requests and records progress using the same two calls Pluralsight makes
+   when you click an item's link:
+     PUT  /channels/api/users/external-link/{itemId}/activity  {isCompleted:true}
+     POST /channels/api/channel-activity                         {channelId}
+   ====================================================================== */
+function bookmarklet(FEED) {
+  var m = location.pathname.match(/\/channels\/details\/([0-9a-f-]{36})/i);
+  if (location.origin !== 'https://app.pluralsight.com' || !m) {
+    alert('Training Feed: open your Pluralsight channel page first, then click this bookmark.');
+    return;
+  }
+  window.__psFeedChannel = m[1];
+  window.__psFeedAck = false;
+  function toast(msg, ms) {
+    var t = document.getElementById('__psfeed_toast') || document.createElement('div');
+    t.id = '__psfeed_toast';
+    t.setAttribute('style', 'position:fixed;z-index:2147483647;top:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 18px;border-radius:10px;font:15px system-ui;box-shadow:0 6px 24px #0008');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    clearTimeout(t.__h);
+    if (ms) t.__h = setTimeout(function () { t.remove(); }, ms);
+    return t;
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.credentials = 'include';
+    opts.headers = { 'accept': 'application/json, text/plain, */*', 'content-type': 'application/vnd.api+json' };
+    return fetch('/channels/api/' + path + '?cache=' + Date.now(), opts).then(function (r) {
+      if (!r.ok) throw new Error('Pluralsight returned HTTP ' + r.status + (r.status === 401 || r.status === 403 ? ' (signed out?)' : ''));
+      return r;
+    });
+  }
+  if (!window.__psFeedHandler) {
+    window.__psFeedHandler = async function (e) {
+      if (e.origin !== FEED) return;
+      var d = e.data || {}, src = e.source, ch = window.__psFeedChannel;
+      var reply = function (x) { src.postMessage(x, e.origin); };
+      try {
+        if (d.type === 'psfeed:hello') {
+          window.__psFeedAck = true;
+          var r = await Promise.all([
+            api('content/' + ch).then(function (x) { return x.json(); }),
+            api('content/' + ch + '/progress').then(function (x) { return x.json(); }),
+            api('channel/' + ch).then(function (x) { return x.json(); }).catch(function () { return null; })
+          ]);
+          var name = (r[2] && r[2].data && r[2].data.name) || document.title.replace(/\s*\|\s*Pluralsight\s*$/, '');
+          reply({ type: 'psfeed:data', channelId: ch, channelUrl: location.href, name: name, content: r[0].data.content, progress: r[1].data.content });
+          toast('📚 Connected to Training Feed. Keep this tab open while you watch.', 5000);
+        } else if (d.type === 'psfeed:track' && /^[0-9a-f-]{36}$/i.test(d.id)) {
+          await api('users/external-link/' + d.id + '/activity', { method: 'PUT', body: JSON.stringify({ data: { isCompleted: true } }) });
+          await api('channel-activity', { method: 'POST', body: JSON.stringify({ data: { channelId: ch } }) });
+          reply({ type: 'psfeed:tracked', id: d.id, ok: true });
+        }
+      } catch (err) {
+        reply({ type: d.type === 'psfeed:track' ? 'psfeed:tracked' : 'psfeed:error', id: d.id, ok: false, error: String((err && err.message) || err) });
+      }
+    };
+    window.addEventListener('message', window.__psFeedHandler);
+  }
+  var target = null;
+  try { if (window.opener && !window.opener.closed) target = window.opener; } catch (e) {}
+  if (!target) target = window.open(FEED + '/', 'ps-training-feed');
+  var started = Date.now(), offered = false;
+  (function announce() {
+    if (window.__psFeedAck) { try { target.focus(); } catch (e) {} return; }
+    try { target && target.postMessage({ type: 'psfeed:announce' }, FEED); } catch (e) {}
+    if (!offered && Date.now() - started > 2500) {
+      offered = true;
+      var t = toast('Training Feed tab not found. ');
+      var b = document.createElement('button');
+      b.textContent = 'Open Training Feed';
+      b.setAttribute('style', 'margin-left:8px;padding:6px 12px;border-radius:8px;border:0;background:#ff1675;color:#fff;font:inherit;cursor:pointer');
+      b.onclick = function () { target = window.open(FEED + '/', 'ps-training-feed'); started = Date.now(); t.remove(); };
+      t.appendChild(b);
+      t.appendChild(document.createElement('br'));
+      t.appendChild(document.createTextNode('Is the Training Feed server window still running?'));
+    }
+    if (Date.now() - started < 30000) setTimeout(announce, 300);
+  })();
+}
+$('#bm').href = 'javascript:' + encodeURIComponent('(' + bookmarklet.toString() + ')(' + JSON.stringify(location.origin) + ')');
+
+/* ---------------- connection to the Pluralsight tab ---------------- */
+$('#openPs').onclick = e => {
+  e.preventDefault();
+  psWin = window.open(store.get('channelUrl', DEFAULT_CHANNEL_URL), 'ps-training-tab');
+  $('#setupStatus').textContent = 'Now click the 📚 Training Feed bookmark in the Pluralsight tab.';
+};
+
+function sendToPs(msg) { if (psWin && !psWin.closed) { psWin.postMessage(msg, PS_ORIGIN); return true; } return false; }
+const connected = () => !!(psWin && !psWin.closed);
+
+window.addEventListener('message', e => {
+  if (e.origin !== PS_ORIGIN) return;
+  const d = e.data || {};
+  if (d.type === 'psfeed:announce') { psWin = e.source; sendToPs({ type: 'psfeed:hello' }); }
+  else if (d.type === 'psfeed:data') { psWin = e.source; onData(d); }
+  else if (d.type === 'psfeed:tracked') onTracked(d);
+  else if (d.type === 'psfeed:error') { $('#setupStatus').textContent = 'Pluralsight error: ' + d.error; toast('Pluralsight error: ' + d.error, 6000); }
+});
+// When the bookmarklet opened this tab, it's our opener and already listening.
+try { if (window.opener) { psWin = window.opener; sendToPs({ type: 'psfeed:hello' }); } } catch {}
+
+setInterval(() => {
+  const c = $('#conn');
+  c.classList.toggle('off', !connected());
+  c.textContent = connected() ? '● Connected' : '● Not connected: views won\'t count (click to reconnect)';
+}, 1500);
+$('#conn').onclick = () => {
+  if (connected()) return;
+  psWin = window.open(store.get('channelUrl', DEFAULT_CHANNEL_URL), 'ps-training-tab');
+  toast('In the Pluralsight tab, click the 📚 Training Feed bookmark.', 6000);
+};
+
+/* ---------------- data ---------------- */
+function flatten(content) {
+  const out = [];
+  const walk = (arr, section) => (arr || []).forEach(x => {
+    if (x.type === 'section') walk(x.content, x.name);
+    else out.push({ ...x, section: section || '' });
+  });
+  walk(content, '');
+  return out;
+}
+
+function mediaOf(it) {
+  try {
+    const u = new URL(it.url);
+    const host = u.hostname.replace(/^(www|m)\./, '');
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      let id = u.searchParams.get('v');
+      if (!id) { const m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([\w-]{11})/); id = m && m[1]; }
+      if (id) return { kind: 'yt', id, vertical: u.pathname.startsWith('/shorts/'), start: parseInt(u.searchParams.get('t'), 10) || 0 };
+    }
+    if (host === 'youtu.be') return { kind: 'yt', id: u.pathname.slice(1, 12), vertical: false, start: parseInt(u.searchParams.get('t'), 10) || 0 };
+    if (host === 'tiktok.com') {
+      const m = u.pathname.match(/\/(?:video|photo)\/(\d+)/);
+      if (m) return { kind: 'tt', id: m[1], vertical: true };
+    }
+  } catch {}
+  return { kind: 'link' };
+}
+
+function onData(d) {
+  const fresh = d.channelId !== channelId || !items.length;
+  channelId = d.channelId; channelName = d.name || 'Training';
+  store.set('channelUrl', d.channelUrl.split('?')[0]);
+  for (const [id, p] of Object.entries(d.progress || {})) if (p && p.percentComplete >= 1) done.add(id);
+  if (fresh) {
+    items = flatten(d.content).map(it => ({ ...it, media: it.type === 'external-link' ? mediaOf(it) : { kind: 'link' } }));
+    $('#setup').hidden = true; $('#app').hidden = false;
+    $('#chName').textContent = channelName;
+    document.title = channelName + ' · Training Feed';
+    $('#hideDone').checked = settings.hideDone;
+    const last = store.get('last:' + channelId, null);
+    const lastIdx = items.findIndex(i => i.id === last);
+    // Resume where you left off unless it's already done; otherwise first item not done yet.
+    const start = (lastIdx >= 0 && !done.has(last)) ? items[lastIdx] : (items.find(i => !done.has(i.id)) || items[lastIdx] || items[0]);
+    build(start && start.id);
+  } else {
+    slides.forEach((s, i) => updateBadge(i));
+  }
+  updateCount(); buildJump(); updateRail();
+}
+
+/* ---------------- rendering ---------------- */
+const fmtDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h}h ${m}m` : `${Math.max(m, 1)}m`; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function build(focusId) {
+  teardown();
+  visible = settings.hideDone ? items.filter(i => !done.has(i.id) || i.id === focusId) : items.slice();
+  const feed = $('#feed');
+  feed.replaceChildren();
+  if (!visible.length) { feed.innerHTML = '<div class="empty">🎉 Everything in this channel has counted.</div>'; slides = []; return; }
+  slides = visible.map((it, i) => {
+    const s = document.createElement('section');
+    s.className = 'slide';
+    s.dataset.i = i;
+    const md = it.media;
+    let body;
+    if (md.kind === 'yt' || md.kind === 'tt') {
+      const thumb = md.kind === 'yt' ? `<img class="thumb" loading="lazy" alt="" src="https://i.ytimg.com/vi/${md.id}/hqdefault.jpg">` : '';
+      body = `<div class="frame ${md.vertical ? 'v' : 'h'}">${thumb}<div class="mount"></div>${md.kind === 'yt' ? '<div class="tap"></div>' : ''}<div class="pstatus"></div></div>`;
+    } else {
+      body = linkCard(it, '');
+    }
+    s.innerHTML = body + `
+      <div class="caption">
+        <div class="meta">${esc(it.section)} · ${items.indexOf(it) + 1} / ${items.length}</div>
+        <h2 title="${esc(it.title)}">${esc(it.title)}</h2>
+        <div class="tags"><span>${esc(it.contentType || it.type)}</span>${it.level ? `<span>${esc(it.level)}</span>` : ''}<span>${fmtDur(it.duration)}</span><span class="badge"></span></div>
+      </div>`;
+    wireCard(s, it);
+    const tap = s.querySelector('.tap');
+    if (tap) tap.onclick = () => togglePlay();
+    feed.appendChild(s);
+    return s;
+  });
+  slides.forEach((_, i) => updateBadge(i));
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting && en.intersectionRatio >= 0.6) activate(+en.target.dataset.i); });
+  }, { root: feed, threshold: [0.6] });
+  slides.forEach(s => observer.observe(s));
+  const idx = Math.max(0, visible.findIndex(i => i.id === focusId));
+  slides[idx].scrollIntoView({ behavior: 'instant', block: 'start' });
+  activate(idx);
+}
+
+function linkCard(it, reason) {
+  const isArticle = it.contentType === 'Article';
+  const host = (() => { try { return new URL(it.url).hostname.replace(/^www\./, ''); } catch { return ''; } })();
+  return `<div class="card">
+    <div class="icon">${isArticle ? '📄' : '🎬'}</div>
+    <h3>${esc(it.title)}</h3>
+    <p>${reason || (isArticle ? 'This site doesn\'t allow embedding, so it opens in a reading tab.' : 'This one can\'t play inside the feed.')} It counts as soon as you open it.</p>
+    <a class="btn primary open" href="#">${isArticle ? 'Open article' : 'Open on ' + esc(host)} ↗</a>
+    ${isArticle ? '<p class="tip">Tip: in the article tab press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> for Reading mode, then ▶ to have it read aloud.</p>' : ''}
+  </div>`;
+}
+function wireCard(slide, it) {
+  const b = slide.querySelector('.card .open');
+  if (b) b.onclick = e => { e.preventDefault(); openOriginal(it); };
+}
+function showFallback(slide, it, reason) {
+  const frame = slide.querySelector('.frame');
+  if (!frame) return;
+  frame.outerHTML = linkCard(it, reason);
+  wireCard(slide, it);
+  slide.classList.remove('live', 'paused');
+}
+
+function updateBadge(i) {
+  const it = visible[i], b = slides[i] && slides[i].querySelector('.badge');
+  if (!b) return;
+  b.className = 'badge' + (done.has(it.id) ? ' done' : pending.has(it.id) ? ' pending' : '');
+  b.textContent = done.has(it.id) ? '✓ Counted' : pending.has(it.id) ? 'Counting…' : 'Not counted yet';
+}
+function updateCount() { $('#count').textContent = `${items.filter(i => done.has(i.id)).length} / ${items.length} done`; }
+
+function buildJump() {
+  const sel = $('#jump');
+  const sections = [...new Set(items.map(i => i.section))];
+  sel.innerHTML = '<option value="">Jump to…</option><option value="@next">Next item not done</option>' +
+    sections.map(s => `<option value="${esc(s)}">${esc(s || '(no section)')}</option>`).join('');
+  sel.onchange = () => {
+    const v = sel.value; sel.value = '';
+    let target;
+    if (v === '@next') target = visible.slice(activeIdx + 1).concat(visible.slice(0, activeIdx)).find(i => !done.has(i.id));
+    else target = visible.find(i => i.section === v);
+    if (!target) return toast(v === '@next' ? 'Everything here has counted 🎉' : 'Nothing in that section (try unchecking "Hide done").', 3000);
+    slides[visible.indexOf(target)].scrollIntoView({ behavior: 'instant', block: 'start' });
+  };
+}
+
+/* ---------------- players ---------------- */
+let ytReadyResolve, ytLoaded = false, ytFailed = false;
+const ytReady = new Promise(r => (ytReadyResolve = r));
+window.onYouTubeIframeAPIReady = () => { ytLoaded = true; ytReadyResolve(); };
+const yts = document.createElement('script'); yts.src = 'https://www.youtube.com/iframe_api';
+yts.onerror = () => { ytFailed = true; };
+document.head.appendChild(yts);
+const setStatus = (slide, msg) => { const s = slide.querySelector('.pstatus'); if (s) s.textContent = msg; };
+
+function activate(i) {
+  if (i === activeIdx || !visible[i]) return;
+  teardown();
+  activeIdx = i;
+  const it = visible[i], slide = slides[i];
+  store.set('last:' + channelId, it.id);
+  updateRail();
+  if (it.media.kind === 'yt') mountYT(slide, it);
+  else if (it.media.kind === 'tt') mountTT(slide, it);
+  if (it.media.kind !== 'link' && !done.has(it.id)) {
+    trackTimer = setTimeout(() => { if (visible[activeIdx] === it) track(it); }, VIEW_SECONDS_BEFORE_COUNTING * 1000);
+  }
+}
+
+function teardown() {
+  clearTimeout(trackTimer); clearInterval(posTimer);
+  if (player) {
+    savePos(player);
+    try { player.destroy(); } catch {}
+    player = null;
+  }
+  if (ttFrame) { ttFrame.remove(); ttFrame = null; }
+  if (slides[activeIdx]) slides[activeIdx].classList.remove('live', 'paused');
+  activeIdx = -1;
+}
+
+function savePos(p) {
+  try {
+    const t = p.getCurrentTime(), d = p.getDuration();
+    store.set('pos:' + p.__itemId, (t > 10 && d && t < d - 15) ? Math.floor(t) : 0);
+  } catch {}
+}
+
+async function mountYT(slide, it) {
+  setStatus(slide, 'Loading YouTube player…');
+  const scriptOk = await Promise.race([ytReady.then(() => true), new Promise(r => setTimeout(() => r(ytLoaded), 8000))]);
+  if (visible[activeIdx] !== it) return;
+  if (!scriptOk) {
+    clearTimeout(trackTimer);
+    showFallback(slide, it, ytFailed
+      ? 'Your browser blocked YouTube\'s player script (www.youtube.com/iframe_api). This is usually an ad/privacy blocker extension or a network filter.'
+      : 'YouTube\'s player script didn\'t load within 8 seconds.');
+    return;
+  }
+  setStatus(slide, 'Starting video…');
+  let readyTimer = setTimeout(() => {
+    if (visible[activeIdx] !== it || slide.classList.contains('live')) return;
+    setStatus(slide, 'The YouTube player hasn\'t started. Something may be blocking youtube.com embeds. Use ↗ Open to watch it on YouTube.');
+  }, 10000);
+  const el = document.createElement('div');
+  slide.querySelector('.mount').replaceChildren(el);
+  const saved = store.get('pos:' + it.id, 0);
+  const p = new YT.Player(el, {
+    width: '100%', height: '100%', videoId: it.media.id,
+    playerVars: { autoplay: 1, playsinline: 1, rel: 0, origin: location.origin, start: saved || it.media.start || 0 },
+    events: {
+      onReady: e => { clearTimeout(readyTimer); try { e.target.setPlaybackRate(settings.rate); } catch {} e.target.playVideo(); slide.classList.add('live'); },
+      onStateChange: e => {
+        slide.classList.add('live');
+        slide.classList.toggle('paused', e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.CUED);
+        if (e.data === YT.PlayerState.ENDED) { store.set('pos:' + it.id, 0); if (settings.autoNext) go(1); }
+      },
+      onError: e => {
+        clearTimeout(readyTimer);
+        const why = { 2: 'YouTube rejected the video id.', 5: 'YouTube couldn\'t play this in an embedded player.', 100: 'This video was removed or made private.',
+                      101: 'The owner of this video doesn\'t allow it to play inside other pages.', 150: 'The owner of this video doesn\'t allow it to play inside other pages.',
+                      153: 'YouTube refused the embed because the page sent no referrer (open the feed via Start Training Feed.bat, not by double-clicking index.html).' }[e.data]
+                    || 'YouTube player error ' + e.data + '.';
+        if (player === p) { try { p.destroy(); } catch {} player = null; }
+        if (visible[activeIdx] === it) clearTimeout(trackTimer);
+        showFallback(slide, it, why);
+      },
+    },
+  });
+  p.__itemId = it.id;
+  player = p;
+  posTimer = setInterval(() => player && savePos(player), 5000);
+}
+
+function mountTT(slide, it) {
+  const f = document.createElement('iframe');
+  f.src = `https://www.tiktok.com/player/v1/${it.media.id}?autoplay=1&rel=0&description=1&music_info=1`;
+  f.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture';
+  f.allowFullscreen = true;
+  slide.querySelector('.mount').replaceChildren(f);
+  slide.classList.add('live');
+  ttFrame = f;
+}
+
+function togglePlay() {
+  if (!player || !player.getPlayerState) return;
+  player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+}
+
+function openOriginal(it) {
+  const w = window.open(it.url, 'ps-feed-reader');
+  if (w) { try { w.opener = null; } catch {} }
+  if (player) player.pauseVideo();
+  if (it.type === 'external-link') track(it);
+}
+
+/* ---------------- progress tracking ---------------- */
+function track(it) {
+  if (done.has(it.id) || pending.has(it.id) || it.type !== 'external-link') return;
+  if (!sendToPs({ type: 'psfeed:track', id: it.id })) {
+    toast('Not connected to the Pluralsight tab, so this one didn\'t count. Click the red "Not connected" pill to reconnect.', 6000);
+    return;
+  }
+  pending.set(it.id, setTimeout(() => {
+    pending.delete(it.id); refreshBadge(it.id);
+    toast('The Pluralsight tab didn\'t respond. Click the 📚 bookmark there again, then come back.', 7000);
+  }, 10000));
+  refreshBadge(it.id);
+}
+function onTracked(d) {
+  clearTimeout(pending.get(d.id)); pending.delete(d.id);
+  if (d.ok) { done.add(d.id); updateCount(); }
+  else toast('Pluralsight didn\'t record it: ' + d.error, 7000);
+  refreshBadge(d.id);
+}
+function refreshBadge(id) { const i = visible.findIndex(v => v.id === id); if (i >= 0) updateBadge(i); }
+
+/* ---------------- navigation & controls ---------------- */
+function go(delta) {
+  const j = activeIdx + delta;
+  if (slides[j]) slides[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  else if (delta > 0) toast('That\'s the end of the channel 🎉', 2500);
+}
+function updateRail() {
+  $('#speed').querySelector('small').textContent = settings.rate + 'x';
+  $('#auto').classList.toggle('on', settings.autoNext);
+}
+$('#prev').onclick = () => go(-1);
+$('#next').onclick = () => go(1);
+$('#auto').onclick = () => { settings.autoNext = !settings.autoNext; store.set('autoNext', settings.autoNext); updateRail(); toast('Auto-next ' + (settings.autoNext ? 'on' : 'off'), 1500); };
+$('#speed').onclick = () => {
+  settings.rate = RATES[(RATES.indexOf(settings.rate) + 1) % RATES.length];
+  store.set('rate', settings.rate);
+  try { player && player.setPlaybackRate(settings.rate); } catch {}
+  updateRail(); toast('Speed ' + settings.rate + 'x', 1200);
+};
+$('#openOrig').onclick = () => { const it = visible[activeIdx]; if (it) openOriginal(it); };
+$('#hideDone').onchange = e => {
+  settings.hideDone = e.target.checked; store.set('hideDone', settings.hideDone);
+  const cur = visible[activeIdx];
+  build(cur && cur.id);
+  updateCount();
+};
+document.addEventListener('keydown', e => {
+  if ($('#app').hidden || e.target.closest('select, input')) return;
+  const k = e.key;
+  if (k === 'ArrowDown' || k === 'PageDown' || k === 'j') { e.preventDefault(); go(1); }
+  else if (k === 'ArrowUp' || k === 'PageUp' || k === 'k') { e.preventDefault(); go(-1); }
+  else if (k === ' ') { e.preventDefault(); togglePlay(); }
+  else if (k === 'o') { $('#openOrig').click(); }
+});
+window.addEventListener('beforeunload', () => { if (player) savePos(player); });
+
+let toastTimer;
+function toast(msg, ms = 2500) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+</script>
+</body>
+</html>
