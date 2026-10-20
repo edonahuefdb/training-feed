@@ -36,15 +36,15 @@ Contract / behavior:
 - `<html data-theme="...">` holds the resolved palette: `dark` (default), `green`, `pink`, `greyscale`, or `custom`. The saved choice can also be `system`.
 - `green`, `pink`, and `greyscale` take their core colors from the dashboard palettes: `--background` to `--bg`, `--backdrop` to `--panel`, `--accent` to `--text`, `--header` to `--accent`, `--highlight` to `--control`, `--secondary` to `--control-hover`. Each theme sets every variable from Phase 1.
 - `system` resolves to `dark` or `green` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
-- The choice is stored as `psfeed:theme`. A small inline script in `<head>` reads it and sets `data-theme` before the stylesheet paints, so there is no flash.
-- A `select#theme` in `#top` and a second `select` in the setup `.box` stay in sync. Changing either applies the theme at once.
+- The choice is stored as `psfeed:theme`. The `Theme` script in `<head>` reads it, sets `data-theme`, and owns storage and the `system` resolver, so there is no flash.
+- A `select.theme` in `#top` and a second one in the setup `.box` stay in sync. Changing either applies the theme at once.
 - An unknown stored value falls back to `dark`.
 - Each palette sets CSS `color-scheme` (`dark` or `light`) so native controls (select, color input, scrollbars) match.
 
 Tasks:
 - [x] Add `[data-theme]` palette blocks for `green`, `pink`, `greyscale`
-- [x] Add the head script and the `system` resolver
-- [x] Add both selects and one `applyTheme` function that updates `data-theme` and both selects, with storage written on change
+- [x] Add the `Theme` script in `<head>` with the `system` resolver
+- [x] Add both selects, wired to `Theme.setChoice`, keeping both in sync
 - [x] Add a toast on change, like the speed button
 
 Gate: Judge the Green Light, Pink Light, and Greyscale looks in the feed and setup screen. Bring screenshots or the live page.
@@ -63,14 +63,14 @@ What exists today:
 Contract / behavior:
 - Choosing `custom` shows an Edit button beside the select. It opens a small panel with four color inputs: background, panel, text, accent.
 - Every other variable is derived from those four with `color-mix(in srgb, ...)` in the `[data-theme="custom"]` block, so the panel never needs more than four values.
-- Values are stored as `psfeed:customColors` (`{bg, panel, text, accent}`) and applied as inline custom properties on `<html>`. The head script applies them too.
+- Values are stored as `psfeed:customColors` (`{bg, panel, text, accent}`) and applied as inline custom properties on `<html>`. The `Theme` script applies them before first paint.
 - A Reset button restores the starting values (the Dark palette).
 - Invalid or missing stored colors fall back to the Dark values.
 - `README.md` gets a short Themes section covering the selector, the available themes, and how to add one (a new `[data-theme]` block setting every variable).
 
 Tasks:
 - [x] Add the Edit button and four-input panel with live preview
-- [x] Persist and restore custom colors, including in the head script
+- [x] Persist and restore custom colors in `Theme`
 - [x] Add the README Themes section
 
 Acceptance:
@@ -80,7 +80,7 @@ Acceptance:
 
 ## Verify
 
-- Syntax: parse the page's `<script>` with Node (see the state file command)
+- Syntax: `node -e "require('fs').readFileSync('index.html','utf8').match(/<script>[\s\S]*?<\/script>/g).forEach(x=>new Function(x.replace(/<\/?script>/g,'')))"`
 - Static: a search of the `<style>` block for hex colors outside the allowed spots
 - Live: serve with `python -I serve.py`, open `http://127.0.0.1:8765`, reveal the feed from DevTools by clearing `hidden` on `#app` and setting `hidden` on `#setup`, and check each theme
 - There is no test suite or CI in this repo, and none is added
