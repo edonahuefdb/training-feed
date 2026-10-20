@@ -29,8 +29,8 @@ Use the rail on the right for playback speed (YouTube) and auto-next.
 
 Pick a theme from the **Theme** dropdown in the top bar (also on the setup screen). The choice is saved in the browser and applied before the page paints.
 
-- **Dark** (default), **Green Light**, **Pink Light**, **Greyscale**
-- **System** follows the OS light/dark setting (light resolves to Green Light)
+- **Dark** (default), **Greyscale**, **Green Light**, **Pink Light**
+- **System** follows the OS light/dark setting (light resolves to Greyscale)
 - **Custom** shows an **Edit** button with four color pickers (background, panel, text, accent); everything else is derived from them. **Reset** restores the Dark colors.
 
 To add a theme, add a `:root[data-theme="<key>"]` block in `index.html` that sets every variable from the Dark `:root` block, then add `['<key>', '<Label>']` to `CHOICES` in the `Theme` script. The video area stays dark in every theme.

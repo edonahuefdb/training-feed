@@ -2,7 +2,7 @@
 
 Branch: `feature/theme-selector`. Base: `main`.
 
-Adds a theme dropdown to the top bar and setup screen with Dark (today's look), Green Light, Pink Light, Greyscale, System, and Custom. Green Light, Pink Light, and Greyscale reuse palettes from the dashboard (`web-app/dashboard/Dashboard-lydia/wwwroot/index.html`): Green Light is its working-copy default, Pink Light is its default on `origin/main`. The choice persists in `localStorage` and applies before first paint.
+Adds a theme dropdown to the top bar and setup screen with System, Dark (today's look), Greyscale, Green Light, Pink Light, and Custom. Green Light, Pink Light, and Greyscale reuse palettes from the dashboard (`web-app/dashboard/Dashboard-lydia/wwwroot/index.html`): Green Light is its working-copy default, Pink Light is its default on `origin/main`. The choice persists in `localStorage` and applies before first paint.
 
 ## Phase 1: Chrome colors come from CSS variables
 
@@ -35,7 +35,7 @@ What exists today:
 Contract / behavior:
 - `<html data-theme="...">` holds the resolved palette: `dark` (default), `green`, `pink`, `greyscale`, or `custom`. The saved choice can also be `system`.
 - `green`, `pink`, and `greyscale` take their core colors from the dashboard palettes: `--background` to `--bg`, `--backdrop` to `--panel`, `--accent` to `--text`, `--header` to `--accent`, `--highlight` to `--control`, `--secondary` to `--control-hover`. Each theme sets every variable from Phase 1.
-- `system` resolves to `dark` or `green` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
+- `system` resolves to `dark` or `greyscale` from `prefers-color-scheme` and follows live changes. Phase 3 adds `custom` to the valid values.
 - The choice is stored as `psfeed:theme`. The `Theme` script in `<head>` reads it, sets `data-theme`, and owns storage and the `system` resolver, so there is no flash.
 - A `select.theme` in `#top` and a second one in the setup `.box` stay in sync. Changing either applies the theme at once.
 - An unknown stored value falls back to `dark`.
