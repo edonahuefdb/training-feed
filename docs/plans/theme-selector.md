@@ -13,13 +13,13 @@ What exists today:
 - The bookmarklet toast (inline `style` strings at `bookmarklet()`) runs on the Pluralsight page, not in this app.
 
 Contract / behavior:
-- New variables, with Dark values equal to the current hardcoded ones: `--control`, `--control-hover`, `--border`, `--field`, `--chip`, `--rail`, `--rail-hover`, `--rail-label`, `--scrim`, `--toast-bg`, `--toast-border`, `--on-accent`, `--ok-bg`, `--ok-fg`, `--bad-bg`, `--bad-fg`, `--pending-bg`, `--pending-fg`.
+- New variables, with Dark values equal to the current hardcoded ones: `--on-accent`, `--control`, `--control-hover`, `--border`, `--well`, `--field`, `--chip`, `--rail`, `--rail-hover`, `--rail-label`, `--scrim`, `--toast-bg`, `--toast-fg`, `--toast-border`, `--ok-bg`, `--ok-fg`, `--bad-bg`, `--bad-fg`, `--done-bg`, `--done-fg`, `--pending-bg`, `--pending-fg`.
 - After this phase, hex and `rgb()` colors appear in the `<style>` block only inside `:root`, the video-area rules, and the `text-shadow` or `box-shadow` values.
 - Rendering in Dark is unchanged.
 
 Tasks:
-- [ ] Add the variables to `:root` with current values
-- [ ] Replace each hardcoded chrome color with its variable
+- [x] Add the variables to `:root` with current values
+- [x] Replace each hardcoded chrome color with its variable
 
 Acceptance:
 - Loading the feed with the Dark values looks identical to before (compare against the current server's page)

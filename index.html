@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Training Feed</title>
 <style>
-  :root { --bg:#0b0b0f; --panel:#17171f; --text:#f2f2f5; --muted:#9a9aa8; --accent:#ff1675; --ok:#22c55e; --warn:#f59e0b; }
+  :root { --bg:#0b0b0f; --panel:#17171f; --text:#f2f2f5; --muted:#9a9aa8; --accent:#ff1675; --ok:#22c55e; --warn:#f59e0b;
+          --on-accent:#fff; --control:#2a2a36; --control-hover:#34344a; --border:#3a3a48; --well:#20202a; --field:#20202acc; --chip:#33333f;
+          --rail:#ffffff1f; --rail-hover:#ffffff33; --rail-label:#ddd; --scrim:#000c; --toast-bg:#000d; --toast-fg:#f2f2f5; --toast-border:#333;
+          --ok-bg:#1f3a2a; --ok-fg:#9be7b4; --bad-bg:#4a1f1f; --bad-fg:#ffb4b4; --done-bg:#173a25; --done-fg:#86efac; --pending-bg:#3a3217; --pending-fg:#fcd34d; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
   button, select { font:inherit; color:inherit; }
@@ -20,24 +23,24 @@
   #setup li { margin:0 0 20px; }
   #setup li b { display:block; margin-bottom:6px; }
   #setup .hint { color:var(--muted); font-size:13px; margin-top:6px; }
-  .bm { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; cursor:grab; }
-  .btn { display:inline-block; padding:8px 14px; border-radius:8px; background:#2a2a36; border:1px solid #3a3a48; cursor:pointer; text-decoration:none; }
-  .btn:hover { background:#34344a; }
-  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:#20202a; color:var(--muted); font-size:13px; }
+  .bm { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--accent); color:var(--on-accent); text-decoration:none; font-weight:600; cursor:grab; }
+  .btn { display:inline-block; padding:8px 14px; border-radius:8px; background:var(--control); border:1px solid var(--border); cursor:pointer; text-decoration:none; }
+  .btn:hover { background:var(--control-hover); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600; }
+  #setup .status { margin-top:16px; padding:10px 12px; border-radius:8px; background:var(--well); color:var(--muted); font-size:13px; }
 
   /* ---------- feed ---------- */
   #app { height:100%; }
   #top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; gap:12px; align-items:center; padding:10px 16px;
-         background:linear-gradient(#000c, #0000); pointer-events:none; }
+         background:linear-gradient(var(--scrim), transparent); pointer-events:none; }
   #top > * { pointer-events:auto; }
   #top .name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; }
   #top .count { color:var(--muted); white-space:nowrap; }
   #top .spacer { flex:1; }
-  #top select { background:#20202acc; border:1px solid #3a3a48; border-radius:8px; padding:5px 8px; max-width:260px; }
+  #top select { background:var(--field); border:1px solid var(--border); border-radius:8px; padding:5px 8px; max-width:260px; }
   #top label { display:flex; gap:6px; align-items:center; color:var(--muted); white-space:nowrap; cursor:pointer; }
-  #conn { font-size:13px; padding:4px 10px; border-radius:999px; background:#1f3a2a; color:#9be7b4; white-space:nowrap; }
-  #conn.off { background:#4a1f1f; color:#ffb4b4; cursor:pointer; }
+  #conn { font-size:13px; padding:4px 10px; border-radius:999px; background:var(--ok-bg); color:var(--ok-fg); white-space:nowrap; }
+  #conn.off { background:var(--bad-bg); color:var(--bad-fg); cursor:pointer; }
 
   #feed { height:100%; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; }
   #feed::-webkit-scrollbar { display:none; }
@@ -67,18 +70,18 @@
   .caption .meta { color:var(--muted); font-size:13px; }
   .caption h2 { margin:2px 0 4px; font-size:18px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .caption .tags { color:var(--muted); font-size:13px; display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; }
-  .badge { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; background:#33333f; color:var(--muted); }
-  .badge.done { background:#173a25; color:#86efac; }
-  .badge.pending { background:#3a3217; color:#fcd34d; }
+  .badge { padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; background:var(--chip); color:var(--muted); }
+  .badge.done { background:var(--done-bg); color:var(--done-fg); }
+  .badge.pending { background:var(--pending-bg); color:var(--pending-fg); }
 
   #rail { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:20; display:flex; flex-direction:column; gap:12px; }
-  #rail button { width:56px; height:56px; border-radius:50%; border:0; background:#ffffff1f; cursor:pointer; font-size:20px; display:flex; flex-direction:column;
+  #rail button { width:56px; height:56px; border-radius:50%; border:0; background:var(--rail); cursor:pointer; font-size:20px; display:flex; flex-direction:column;
                  align-items:center; justify-content:center; line-height:1; }
-  #rail button:hover { background:#ffffff33; }
-  #rail button small { font-size:10px; margin-top:3px; color:#ddd; }
+  #rail button:hover { background:var(--rail-hover); }
+  #rail button small { font-size:10px; margin-top:3px; color:var(--rail-label); }
   #rail button.on { background:var(--accent); }
 
-  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:#000d; border:1px solid #333; padding:10px 16px;
+  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:50; background:var(--toast-bg); color:var(--toast-fg); border:1px solid var(--toast-border); padding:10px 16px;
            border-radius:10px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:80vw; text-align:center; }
   #toast.show { opacity:1; }
   .empty { height:100vh; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:18px; }
